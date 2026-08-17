@@ -42,6 +42,54 @@ async function apiFetch(path, opts = {}) {
   }
 }
 
+// ─── Persistent AOI Storage (ensures deleted farms never re-appear on reload) ───
+const LocalAOIStore = {
+  getDeletedIds: () => {
+    try {
+      const stored = localStorage.getItem('kd_deleted_aoi_ids');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  },
+  addDeletedId: (id) => {
+    try {
+      const list = LocalAOIStore.getDeletedIds();
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem('kd_deleted_aoi_ids', JSON.stringify(list));
+      }
+    } catch (e) {
+      console.warn('LocalAOIStore addDeletedId error:', e);
+    }
+  },
+  getCustomAOIs: () => {
+    try {
+      const stored = localStorage.getItem('kd_custom_aois');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  },
+  saveCustomAOI: (aoi) => {
+    try {
+      const list = LocalAOIStore.getCustomAOIs().filter(a => a.id !== aoi.id);
+      list.unshift(aoi);
+      localStorage.setItem('kd_custom_aois', JSON.stringify(list));
+    } catch (e) {
+      console.warn('LocalAOIStore saveCustomAOI error:', e);
+    }
+  },
+  removeCustomAOI: (id) => {
+    try {
+      const list = LocalAOIStore.getCustomAOIs().filter(a => a.id !== id);
+      localStorage.setItem('kd_custom_aois', JSON.stringify(list));
+    } catch (e) {
+      console.warn('LocalAOIStore removeCustomAOI error:', e);
+    }
+  },
+};
+
 export const api = {
 
   // ─── Auth API ────────────────────────────────────────────────────────────────
@@ -103,13 +151,23 @@ export const api = {
 
   // ─── AOI API ─────────────────────────────────────────────────────────────────
   async getAOIs(district = null) {
+    const deletedIds = LocalAOIStore.getDeletedIds();
+    const customAOIs = LocalAOIStore.getCustomAOIs();
+
     const url = district ? `/aois?district=${encodeURIComponent(district)}` : '/aois';
     const res = await apiFetch(url);
-    if (res?.ok) return res.json();
-
-    console.warn('[API] Using offline AOI mock list');
-    return {
-      aois: [
+    
+    let rawAois = [];
+    if (res?.ok) {
+      try {
+        const data = await res.json();
+        rawAois = data.aois || [];
+      } catch {
+        rawAois = [];
+      }
+    } else {
+      console.warn('[API] Using offline AOI mock list with local persistent storage');
+      rawAois = [
         {
           id: 1, owner_id: 101,
           name: 'Ramesh 5-Acre Cotton Plot',
@@ -132,57 +190,107 @@ export const api = {
           district: 'Jalna', taluk: 'Jalna', village: 'Ghanewadi', state: 'Maharashtra', is_active: true,
           created_at: new Date().toISOString(),
         },
-      ],
-      total: 2,
+      ];
+    }
+
+    // Merge custom marked farms and remove any deleted IDs
+    const mergedMap = new Map();
+    [...customAOIs, ...rawAois].forEach(item => {
+      if (item && item.id && !mergedMap.has(item.id)) {
+        mergedMap.set(item.id, item);
+      }
+    });
+
+    const filtered = Array.from(mergedMap.values()).filter(a => !deletedIds.includes(a.id));
+    return {
+      aois: filtered,
+      total: filtered.length,
     };
   },
 
   async createAOI(aoiData) {
-    const res = await apiFetch('/aois', {
-      method: 'POST',
-      body: JSON.stringify(aoiData),
-    });
-    if (res?.ok) return res.json();
+    let created = null;
+    try {
+      const res = await apiFetch('/aois', {
+        method: 'POST',
+        body: JSON.stringify(aoiData),
+      });
+      if (res?.ok) {
+        created = await res.json();
+      }
+    } catch (e) {
+      console.warn('[API] Create AOI network error:', e);
+    }
 
-    console.warn('[API] Using offline AOI create fallback');
-    return {
-      id: Math.floor(Math.random() * 1000) + 10,
-      owner_id: 101,
-      name: aoiData.name || 'Drawn Farm Polygon',
-      geometry: aoiData.geometry,
-      aoi_type: aoiData.aoi_type || 'farm',
-      crop_type: aoiData.crop_type || 'cotton',
-      area_hectares: aoiData.area_hectares || 2.5,
-      district: aoiData.district || 'Jalna',
-      taluk: aoiData.taluk || 'Jalna',
-      village: aoiData.village || 'Mantha',
-      state: 'Maharashtra',
-      is_active: true,
-      created_at: new Date().toISOString(),
-    };
+    if (!created) {
+      console.warn('[API] Using offline AOI create fallback');
+      created = {
+        id: Date.now(),
+        owner_id: 101,
+        name: aoiData.name || 'Drawn Farm Polygon',
+        geometry: aoiData.geometry,
+        aoi_type: aoiData.aoi_type || 'farm',
+        crop_type: aoiData.crop_type || 'cotton',
+        area_hectares: aoiData.area_hectares || 2.5,
+        district: aoiData.district || 'Jalna',
+        taluk: aoiData.taluk || 'Jalna',
+        village: aoiData.village || 'Mantha',
+        state: 'Maharashtra',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    // Persist locally so it remains across reload
+    LocalAOIStore.saveCustomAOI(created);
+    return created;
   },
 
   async updateAOI(aoiId, updateData) {
-    const res = await apiFetch(`/aois/${aoiId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updateData),
-    });
-    if (res?.ok) return res.json();
+    let updated = null;
+    try {
+      const res = await apiFetch(`/aois/${aoiId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updateData),
+      });
+      if (res?.ok) {
+        updated = await res.json();
+      }
+    } catch (e) {
+      console.warn('[API] Update AOI network error:', e);
+    }
 
-    console.warn('[API] Using offline AOI update fallback');
-    return {
-      id: aoiId,
-      ...updateData,
-    };
+    if (!updated) {
+      updated = {
+        id: aoiId,
+        ...updateData,
+      };
+    }
+
+    // Update in local store
+    const customs = LocalAOIStore.getCustomAOIs();
+    const existing = customs.find(a => a.id === aoiId);
+    if (existing) {
+      LocalAOIStore.saveCustomAOI({ ...existing, ...updated });
+    }
+    return updated;
   },
 
   async deleteAOI(aoiId) {
-    const res = await apiFetch(`/aois/${aoiId}`, {
-      method: 'DELETE',
-    });
-    if (res?.ok) return res.json();
+    // 1. Immediately register in persistent deleted list and remove from local storage
+    LocalAOIStore.addDeletedId(aoiId);
+    LocalAOIStore.removeCustomAOI(aoiId);
 
-    console.warn('[API] Using offline AOI delete fallback');
+    // 2. Call backend DELETE endpoint if online
+    try {
+      const res = await apiFetch(`/aois/${aoiId}`, {
+        method: 'DELETE',
+      });
+      if (res?.ok) return res.json();
+    } catch (e) {
+      console.warn('[API] Delete AOI network warning:', e);
+    }
+
     return { success: true, deleted_id: aoiId };
   },
 
