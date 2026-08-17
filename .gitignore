@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+dist/
+build/
+
+# Environment
+.env
+backend/.env
+.env.local
+.env.*.local
+
+# Python Cache & DB
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite
+*.db
+backend/krishidristi.db
+
+# Generated Artifacts
+backend/static/reports/*.pdf
+.DS_Store
