@@ -55,6 +55,12 @@ export const translations = {
       stopAudio: "Stop Audio",
       downloadReport: "Download Report",
       belowNormal: "Below Normal",
+      deletePlot: "Delete Farm Plot",
+      deleteConfirm: "Are you sure you want to delete this farm plot? All satellite records and yield predictions for this plot will be deleted.",
+      managePlots: "My Marked Farms",
+      noPlots: "No farm plots marked yet. Use 'Locate Me' or 'Draw Farm Boundary' on the map to add your farm.",
+      switchPlot: "Switch Farm",
+      activePlot: "Active Plot",
       voiceMessage: "Namaste Farmer brother. For your farm plot. Your crop health score is {score} percent. Action required: Please give drip irrigation within forty-eight hours to protect your crop and avoid yield loss. Expected harvest is {yield} quintals per acre."
     },
     government: {
@@ -132,6 +138,12 @@ export const translations = {
       stopAudio: "ऑडिओ थांबवा",
       downloadReport: "अहवाल डाउनलोड",
       belowNormal: "सरासरीपेक्षा कमी",
+      deletePlot: "हे शेत हटवा",
+      deleteConfirm: "तुम्हाला हे शेत हटवायचे आहे का? या शेताशी संबंधित सर्व उपग्रह स्कॅन आणि अंदाज कायमचे काढून टाकले जातील.",
+      managePlots: "माझी नोंदणीकृत शेते",
+      noPlots: "अद्याप कोणतेही शेत चिन्हांकित नाही. नकाशावर 'माझे स्थान शोधा' किंवा 'शेताची हद्द आखा' वापरून शेत जोडा.",
+      switchPlot: "शेत बदला",
+      activePlot: "सध्याचे शेत",
       voiceMessage: "नमस्कार शेतकरी बंधू. तुमच्या शेताचा आरोग्य स्कोअर {score} टक्के आहे. तातडीचा सल्ला: बोंड गळती थांबवण्यासाठी पुढील ४८ तासांत पिकाला पाणी द्या. अपेक्षित उत्पादन {yield} क्विंटल प्रति एकर आहे."
     },
     government: {
@@ -209,6 +221,12 @@ export const translations = {
       stopAudio: "ऑडियो रोकें",
       downloadReport: "रिपोर्ट डाउनलोड",
       belowNormal: "सामान्य से कम",
+      deletePlot: "यह खेत हटाएं",
+      deleteConfirm: "क्या आप वाकई इस खेत को हटाना चाहते हैं? सभी संबंधित उपग्रह स्कैन और उपज विश्लेषण हटा दिए जाएंगे।",
+      managePlots: "मेरे चिह्नित खेत",
+      noPlots: "अभी तक कोई खेत चिह्नित नहीं है। नया खेत जोड़ने के लिए नक्शे पर 'खेत की सीमा बनाएं' या 'मेरा स्थान' चुनें।",
+      switchPlot: "खेत बदलें",
+      activePlot: "सक्रिय खेत",
       voiceMessage: "नमस्ते किसान भाई। आपके खेत का स्वास्थ्य स्कोर {score} प्रतिशत है। जरूरी सलाह: टिंडे गिरने से बचाने के लिए अगले 48 घंटों में ड्रिप सिंचाई जरूर करें। अनुमानित उपज {yield} क्विंटल प्रति एकड़ है।"
     },
     government: {
@@ -286,6 +304,12 @@ export const translations = {
       stopAudio: "ನಿಲ್ಲಿಸಿ",
       downloadReport: "ವರದಿ ಡೌನ್‌ಲೋಡ್",
       belowNormal: "ಸಾಮಾನ್ಯಕ್ಕಿಂತ ಕಡಿಮೆ",
+      deletePlot: "ಈ ಜಮೀನನ್ನು ಅಳಿಸಿ",
+      deleteConfirm: "ನೀವು ನಿಜವಾಗಿಯೂ ಈ ಜಮೀನನ್ನು ಅಳಿಸಲು ಬಯಸುವಿರಾ?",
+      managePlots: "ನನ್ನ ಗುರುತಿಸಿದ ಜಮೀನುಗಳು",
+      noPlots: "ಯಾವುದೇ ಜಮೀನು ಗುರುತಿಸಲಾಗಿಲ್ಲ.",
+      switchPlot: "ಜಮೀನು ಬದಲಾಯಿಸಿ",
+      activePlot: "ಸಕ್ರಿಯ ಜಮೀನು",
       voiceMessage: "ನಮಸ್ಕಾರ ರೈತ ಮಿತ್ರರೇ. ನಿಮ್ಮ ಜಮೀನಿನ ಆರೋಗ್ಯ ಸ್ಕೋರ್ {score} ಶೇಕಡಾ ಆಗಿದೆ. ತುರ್ತು ಸಲಹೆ: ಬೆಳೆ ರಕ್ಷಣೆಗೆ ಮುಂದಿನ 48 ಗಂಟೆಗಳಲ್ಲಿ ನೀರುಣಿಸಿ. ನಿರೀಕ್ಷಿತ ಇಳುವರಿ ಎಕರೆಗೆ {yield} ಕ್ವಿಂಟಾಲ್ ಆಗಿದೆ."
     },
     government: {
@@ -363,6 +387,12 @@ export const translations = {
       stopAudio: "ఆపండి",
       downloadReport: "నివేదిక డౌన్‌లోడ్",
       belowNormal: "సాధారణం కంటే తక్కువ",
+      deletePlot: "ఈ పొలాన్ని తొలగించండి",
+      deleteConfirm: "మీరు ఖచ్చితంగా ఈ పొలాన్ని తొలగించాలనుకుంటున్నారా?",
+      managePlots: "నా గుర్తించిన పొలాలు",
+      noPlots: "ఇంకా పొలాలు గుర్తించబడలేదు.",
+      switchPlot: "పొలం మార్చండి",
+      activePlot: "సక్రియ పొలం",
       voiceMessage: "నమస్కారం రైతు సోదరులారా. మీ పొలం ఆరోగ్య స్కోరు {score} శాతం. అత్యవసర సలహా: పంట నష్టాన్ని నివారించడానికి తదుపరి 48 గంటల్లో నీరు పెట్టండి. అంచనా దిగుబడి ఎకరానికి {yield} క్వింటాళ్ళు."
     },
     government: {

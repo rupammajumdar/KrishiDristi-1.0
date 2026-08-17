@@ -25,7 +25,10 @@ import {
   Bot,
   Send,
   MessageSquare,
-  Loader2
+  Loader2,
+  Trash2,
+  FolderOpen,
+  MapPin
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { translations } from '../i18n';
@@ -449,7 +452,10 @@ function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
 }
 
 export default function FarmerDashboard({ 
+  aois = [],
   selectedAoi, 
+  onSelectAoi,
+  onDeleteAoi,
   prediction, 
   onGenerateReport, 
   currentLang,
@@ -460,6 +466,8 @@ export default function FarmerDashboard({
   const [showExplainability, setShowExplainability] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isCropDropdownOpen, setIsCropDropdownOpen] = useState(false);
+  const [isPlotManagerOpen, setIsPlotManagerOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Available native languages
   const nativeLanguages = [
@@ -706,81 +714,231 @@ export default function FarmerDashboard({
         </div>
       </div>
 
-      {/* ── 1. Main Farm Header, Crop Switcher & PDF Action ── */}
-      <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h2 className="text-lg font-black text-slate-100">{plotName}</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {areaAc} Acres ({areaHa} Ha)
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                {locationAgroProfile.zoneName}
-              </span>
+      {/* Empty State when all plots are deleted */}
+      {(!selectedAoi || aois.length === 0) && (
+        <div className="glass-card rounded-2xl p-6 border border-slate-800 text-center flex flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <Sprout className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-100">{t.noPlots || 'No farm plots registered'}</h3>
+          <p className="text-xs text-slate-400 max-w-sm">
+            {t.noPlots || "Use the map on the left to click 'Locate Me' (Live GPS) or 'Draw Farm Boundary' to start monitoring your field."}
+          </p>
+        </div>
+      )}
+
+      {/* ── 1. Main Farm Header, Crop Switcher, Plot Manager & PDF Action ── */}
+      {selectedAoi && (
+        <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h2 className="text-lg font-black text-slate-100">{plotName}</h2>
+
+                {/* Plot Switcher & Manager Dropdown Toggle */}
+                {aois.length > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsPlotManagerOpen(!isPlotManagerOpen)}
+                      className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 shadow-sm cursor-pointer transition-colors"
+                      title="Switch or manage marked farms"
+                    >
+                      <FolderOpen className="w-3 h-3 text-emerald-400" />
+                      <span>{t.managePlots || 'Plots'} ({aois.length})</span>
+                      <ChevronDown className="w-3 h-3 opacity-70" />
+                    </button>
+
+                    {/* Plots Dropdown Popover */}
+                    {isPlotManagerOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-80 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-3 shadow-2xl z-50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                          <span className="font-bold text-xs text-slate-200 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>{t.managePlots || 'My Marked Farms'}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                            {aois.length} total
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 max-h-60 overflow-y-auto pr-1">
+                          {aois.map((aoi) => {
+                            const isSelected = selectedAoi?.id === aoi.id;
+                            const isConfirming = deleteConfirmId === aoi.id;
+                            return (
+                              <div
+                                key={aoi.id}
+                                className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? 'bg-emerald-500/15 border-emerald-500/50 shadow-sm'
+                                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                                }`}
+                              >
+                                <div
+                                  onClick={() => {
+                                    if (onSelectAoi) onSelectAoi(aoi);
+                                    setIsPlotManagerOpen(false);
+                                  }}
+                                  className="flex-1 cursor-pointer min-w-0"
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-bold text-slate-100 truncate">{aoi.name}</span>
+                                    {isSelected && (
+                                      <span className="text-[9px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded">
+                                        {t.activePlot || 'Active'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                    {aoi.village || aoi.district || 'Plot'} • {aoi.area_hectares} Ha • <span className="capitalize text-amber-400 font-medium">{aoi.crop_type || 'cotton'}</span>
+                                  </p>
+                                </div>
+
+                                {isConfirming ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (onDeleteAoi) onDeleteAoi(aoi.id);
+                                        setDeleteConfirmId(null);
+                                      }}
+                                      className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold shadow-md cursor-pointer transition-all animate-pulse"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteConfirmId(null);
+                                      }}
+                                      className="px-1.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] cursor-pointer"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirmId(aoi.id);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/80 border border-rose-500/20 text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
+                                    title={t.deletePlot || 'Delete Farm Plot'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {areaAc} Acres ({areaHa} Ha)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  {locationAgroProfile.zoneName}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
+                <span>📍 <span className="text-slate-200 font-semibold">{locationStr}</span></span>
+                <span className="text-slate-600">•</span>
+                <span className="text-emerald-400/90 font-medium">🏛️ {locationAgroProfile.kvkHub}</span>
+              </p>
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
-              <span>📍 <span className="text-slate-200 font-semibold">{locationStr}</span></span>
-              <span className="text-slate-600">•</span>
-              <span className="text-emerald-400/90 font-medium">🏛️ {locationAgroProfile.kvkHub}</span>
-            </p>
+
+            {/* Audio, PDF & Delete Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Voice Readout Button */}
+              <button
+                onClick={handleVoiceAdvisory}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                  isPlayingAudio 
+                    ? 'bg-amber-500 text-slate-950 animate-pulse' 
+                    : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30'
+                }`}
+                title="Listen to advisory in voice"
+              >
+                {isPlayingAudio ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-400" />}
+                <span>{isPlayingAudio ? t.stopAudio : t.listenAudio}</span>
+              </button>
+
+              {/* Download PDF Card */}
+              <button
+                onClick={() => onGenerateReport(selectedAoi?.id || 1, 'farmer')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/50 transition-all cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{t.downloadReport}</span>
+              </button>
+
+              {/* Delete Active Plot Button with Inline Confirmation */}
+              <div className="relative">
+                {deleteConfirmId === selectedAoi.id ? (
+                  <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-500/60 p-1.5 rounded-xl text-xs shadow-xl animate-pulse">
+                    <span className="text-rose-200 text-[10px] font-bold">Delete?</span>
+                    <button
+                      onClick={() => {
+                        if (onDeleteAoi && selectedAoi) onDeleteAoi(selectedAoi.id);
+                        setDeleteConfirmId(null);
+                      }}
+                      className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] cursor-pointer"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] cursor-pointer"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirmId(selectedAoi.id)}
+                    className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/60 border border-rose-500/30 hover:border-rose-500/60 text-rose-400 hover:text-rose-200 transition-all shadow-md cursor-pointer"
+                    title={t.deletePlot || 'Delete this farm plot'}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Audio & PDF Quick Buttons */}
-          <div className="flex items-center gap-2">
-            {/* Voice Readout Button */}
-            <button
-              onClick={handleVoiceAdvisory}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
-                isPlayingAudio 
-                  ? 'bg-amber-500 text-slate-950 animate-pulse' 
-                  : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30'
-              }`}
-              title="Listen to advisory in voice"
-            >
-              {isPlayingAudio ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-400" />}
-              <span>{isPlayingAudio ? t.stopAudio : t.listenAudio}</span>
-            </button>
+          {/* ── CROP SELECTOR (Change Crop Anytime) ── */}
+          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+              <Sprout className="w-3.5 h-3.5 text-amber-400" />
+              <span>Select Your Crop / पीक निवडा:</span>
+            </span>
 
-            {/* Download PDF Card */}
-            <button
-              onClick={() => onGenerateReport(selectedAoi?.id || 1, 'farmer')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/50 transition-all cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>{t.downloadReport}</span>
-            </button>
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 max-w-full">
+              {Object.values(CROPS_DATABASE).map((crop) => {
+                const isSelected = activeCropKey === crop.id;
+                const displayName = crop.names[currentLang] || crop.names.en;
+                return (
+                  <button
+                    key={crop.id}
+                    onClick={() => handleSelectCrop(crop.id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/50 border border-amber-400 scale-105'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-amber-500/50 hover:text-slate-200'
+                    }`}
+                  >
+                    {displayName}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        {/* ── CROP SELECTOR (Change Crop Anytime) ── */}
-        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-            <Sprout className="w-3.5 h-3.5 text-amber-400" />
-            <span>Select Your Crop / पीक निवडा:</span>
-          </span>
-
-          <div className="flex items-center gap-1.5 overflow-x-auto py-1 max-w-full">
-            {Object.values(CROPS_DATABASE).map((crop) => {
-              const isSelected = activeCropKey === crop.id;
-              const displayName = crop.names[currentLang] || crop.names.en;
-              return (
-                <button
-                  key={crop.id}
-                  onClick={() => handleSelectCrop(crop.id)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    isSelected
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/50 border border-amber-400 scale-105'
-                      : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-amber-500/50 hover:text-slate-200'
-                  }`}
-                >
-                  {displayName}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* ── 2. Dynamic Crop Health Status Card ── */}
       <div className={`rounded-2xl p-4 border transition-all ${

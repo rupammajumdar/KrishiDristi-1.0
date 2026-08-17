@@ -115,6 +115,33 @@ export default function App() {
     setTimeout(() => setNotificationToast(null), 4000);
   };
 
+  const handleDeleteAoi = async (aoiId) => {
+    if (!aoiId) return;
+    const aoiToDelete = aois.find(a => a.id === aoiId);
+    const plotName = aoiToDelete?.name || `Farm #${aoiId}`;
+
+    try {
+      await api.deleteAOI(aoiId);
+    } catch (err) {
+      console.warn('Backend delete AOI warning:', err);
+    }
+
+    const remaining = aois.filter(a => a.id !== aoiId);
+    setAois(remaining);
+
+    if (selectedAoi?.id === aoiId) {
+      const nextAoi = remaining.length > 0 ? remaining[0] : null;
+      setSelectedAoi(nextAoi);
+      if (!nextAoi) {
+        setTimeline(null);
+        setPrediction(null);
+      }
+    }
+
+    setNotificationToast(`Farm plot "${plotName}" deleted successfully.`);
+    setTimeout(() => setNotificationToast(null), 4000);
+  };
+
   const handleUpdateCrop = async (newCrop) => {
     const cropKey = (newCrop || 'cotton').toLowerCase();
     if (selectedAoi) {
@@ -159,44 +186,29 @@ export default function App() {
     setTimeout(() => setNotificationToast(null), 4000);
   };
 
-  // If in Admin Mode, show full-screen dedicated Admin Console
-  if (isAdminMode) {
-    return <AdminPanel onExitAdmin={closeAdmin} />;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Bar Header */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
+      {/* Top Universal App Header */}
       <Header
         currentPersona={currentPersona}
         onSelectPersona={setCurrentPersona}
         currentLang={currentLang}
         onSelectLang={setCurrentLang}
-        alertCount={2}
-        onToggleNotifications={() => setIsNotificationsOpen(!isNotificationsOpen)}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
+        unreadCount={alerts.filter(a => !a.is_read).length}
         onOpenAdmin={openAdmin}
+        lastUpdated={lastUpdated}
+        isLive={isLive}
       />
 
-      {/* Live / Offline data source badge */}
-      <div
-        className={`fixed bottom-4 left-4 z-[1100] px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg ${
-          isLive
-            ? 'bg-emerald-900/80 border border-emerald-500/40 text-emerald-300'
-            : 'bg-slate-800/80 border border-slate-600/40 text-slate-400'
-        }`}
-      >
-        <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-        {isLive ? 'Live Data' : 'Demo Mode'}
-        {lastUpdated && (
-          <span className="opacity-60 ml-1">
-            {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        )}
-      </div>
+      {/* Admin Panel Modal / Overlay */}
+      {isAdminMode && (
+        <AdminPanel onClose={closeAdmin} />
+      )}
 
-      {/* Notification Toast */}
+      {/* Toast Notification Banner */}
       {notificationToast && (
-        <div className="fixed top-16 right-6 z-[1100] bg-emerald-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-2xl text-xs flex items-center gap-2 animate-in slide-in-from-top duration-200">
+        <div className="fixed top-20 right-6 z-[9999] bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 border border-emerald-300 animate-bounce">
           <span>✨ {notificationToast}</span>
         </div>
       )}
@@ -211,6 +223,7 @@ export default function App() {
               aois={aois}
               selectedAoi={selectedAoi}
               onSelectAoi={setSelectedAoi}
+              onDeleteAoi={handleDeleteAoi}
               activeLayer={activeLayer}
               setActiveLayer={setActiveLayer}
               opacity={opacity}
@@ -235,7 +248,10 @@ export default function App() {
         <div className="lg:col-span-5 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-100px)]">
           {currentPersona === 'farmer' && (
             <FarmerDashboard
+              aois={aois}
               selectedAoi={selectedAoi}
+              onSelectAoi={setSelectedAoi}
+              onDeleteAoi={handleDeleteAoi}
               prediction={prediction}
               onGenerateReport={handleGenerateReport}
               currentLang={currentLang}

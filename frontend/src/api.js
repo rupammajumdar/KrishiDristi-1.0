@@ -176,6 +176,16 @@ export const api = {
     };
   },
 
+  async deleteAOI(aoiId) {
+    const res = await apiFetch(`/aois/${aoiId}`, {
+      method: 'DELETE',
+    });
+    if (res?.ok) return res.json();
+
+    console.warn('[API] Using offline AOI delete fallback');
+    return { success: true, deleted_id: aoiId };
+  },
+
   // ─── Satellite Timeline API ───────────────────────────────────────────────────
   async getTimeline(aoiId) {
     const res = await apiFetch(`/aois/${aoiId}/timeline`);

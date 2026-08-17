@@ -20,7 +20,9 @@ import {
   Crosshair,
   Loader2,
   Navigation,
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  FolderOpen
 } from 'lucide-react';
 import { translations } from '../i18n';
 import { api } from '../api';
@@ -99,6 +101,7 @@ export default function GISMap({
   aois, 
   selectedAoi, 
   onSelectAoi, 
+  onDeleteAoi,
   activeLayer, 
   setActiveLayer, 
   opacity, 
@@ -110,6 +113,7 @@ export default function GISMap({
   onUpdateCrop
 }) {
   const t = translations[currentLang] || translations.en;
+  const farmerT = t.farmer || translations.en.farmer;
   
   const [baseMap, setBaseMap] = useState('satellite'); // satellite, street, topo
   const [isDrawing, setIsDrawing] = useState(false);
@@ -120,6 +124,8 @@ export default function GISMap({
   const [isLocating, setIsLocating] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
+  const [showPlotsDropdown, setShowPlotsDropdown] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Default Map Center & Zoom state controlled dynamically
   const [mapCenter, setMapCenter] = useState([19.8341, 75.8812]);
@@ -491,6 +497,116 @@ export default function GISMap({
             <span>{compareMode ? 'Exit Split View' : t.nav.splitCompare}</span>
           </button>
 
+          {/* Saved Farms / Plots Selector & Manager */}
+          <div className="relative">
+            <button
+              onClick={() => setShowPlotsDropdown(!showPlotsDropdown)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold shadow-xl backdrop-blur-md transition-all cursor-pointer ${
+                showPlotsDropdown
+                  ? 'bg-emerald-600 text-slate-950 font-bold border border-emerald-400'
+                  : 'bg-slate-900/90 text-slate-200 border border-slate-700/80 hover:border-emerald-500/50 hover:text-emerald-300'
+              }`}
+              title="View & manage marked farms"
+            >
+              <FolderOpen className="w-4 h-4 text-emerald-400" />
+              <span>{farmerT.managePlots || 'Saved Farms'} ({aois.length})</span>
+            </button>
+
+            {showPlotsDropdown && (
+              <div className="absolute top-full right-0 mt-2 w-80 bg-slate-900/95 backdrop-blur-xl border border-slate-700/90 rounded-2xl p-3 shadow-2xl z-[600] flex flex-col gap-2">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-slate-100">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{farmerT.managePlots || 'My Marked Farms'}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                    {aois.length} total
+                  </span>
+                </div>
+
+                {aois.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    <p>{farmerT.noPlots || 'No farm plots marked yet.'}</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1">
+                    {aois.map((aoi) => {
+                      const isSelected = selectedAoi?.id === aoi.id;
+                      const isConfirming = deleteConfirmId === aoi.id;
+                      return (
+                        <div
+                          key={aoi.id}
+                          className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'bg-emerald-500/15 border-emerald-500/50 shadow-sm'
+                              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div
+                            onClick={() => {
+                              onSelectAoi(aoi);
+                              setShowPlotsDropdown(false);
+                            }}
+                            className="flex-1 cursor-pointer min-w-0"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-100 truncate">{aoi.name}</span>
+                              {isSelected && (
+                                <span className="text-[9px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded">
+                                  {farmerT.activePlot || 'Active'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                              {aoi.village || aoi.district || 'Maharashtra'} • {aoi.area_hectares} Ha ({((aoi.area_hectares || 2.5) * 2.471).toFixed(1)} Ac) • <span className="capitalize text-amber-400 font-medium">{aoi.crop_type || 'cotton'}</span>
+                            </p>
+                          </div>
+
+                          {/* Delete Action with inline confirm */}
+                          {isConfirming ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onDeleteAoi) onDeleteAoi(aoi.id);
+                                  setDeleteConfirmId(null);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold shadow-md cursor-pointer transition-all animate-pulse"
+                                title="Confirm delete farm plot"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteConfirmId(null);
+                                }}
+                                className="px-1.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmId(aoi.id);
+                              }}
+                              className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/80 border border-rose-500/20 text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
+                              title={farmerT.deletePlot || 'Delete Farm Plot'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Base Map Switcher */}
           <div className="flex items-center p-1 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl text-xs">
             {['satellite', 'street', 'topo'].map(m => (
@@ -685,6 +801,40 @@ export default function GISMap({
                           </select>
                         </div>
                       )}
+
+                      {/* Delete Plot Button inside Popup */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                        {deleteConfirmId === aoi.id ? (
+                          <div className="w-full flex items-center justify-between gap-2 bg-rose-950/80 p-1.5 rounded-lg border border-rose-500/40">
+                            <span className="text-[10px] text-rose-200 font-bold">Delete this plot?</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  if (onDeleteAoi) onDeleteAoi(aoi.id);
+                                  setDeleteConfirmId(null);
+                                }}
+                                className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold cursor-pointer"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(aoi.id)}
+                            className="w-full py-1 px-2 rounded-lg bg-rose-950/50 hover:bg-rose-900 border border-rose-500/30 text-rose-300 hover:text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <span>{farmerT.deletePlot || 'Delete Farm Plot'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </Popup>
                 </Polygon>

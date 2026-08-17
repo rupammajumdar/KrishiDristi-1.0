@@ -8,13 +8,16 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import shape, mapping
 
 import shapely.wkt
 from app.database import get_db
-from app.models import User, UserRole, AOI, AOIType, CropType, SatellitePass, IndexResult, IndexType
+from app.models import (
+    User, UserRole, AOI, AOIType, CropType, SatellitePass, IndexResult, IndexType,
+    Report, YieldPrediction, Alert, PipelineJob
+)
 from app.schemas import (
     AOICreate, AOIUpdate, AOIResponse, AOIListResponse,
     TimelineResponse, TimelineEntry, IndexResultResponse
@@ -270,6 +273,45 @@ async def update_aoi(
         is_active=aoi.is_active,
         created_at=aoi.created_at
     )
+
+
+@router.delete("/{aoi_id}")
+async def delete_aoi(
+    aoi_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a previously marked/drawn farm plot (AOI) and cascade clean its records.
+    """
+    res = await db.execute(select(AOI).where(AOI.id == aoi_id))
+    aoi = res.scalar_one_or_none()
+
+    if not aoi:
+        raise HTTPException(status_code=404, detail=f"AOI #{aoi_id} not found")
+
+    # Clean up child IndexResults for all SatellitePasses of this AOI
+    pass_res = await db.execute(select(SatellitePass.id).where(SatellitePass.aoi_id == aoi_id))
+    pass_ids = [p for p in pass_res.scalars().all()]
+    if pass_ids:
+        await db.execute(delete(IndexResult).where(IndexResult.pass_id.in_(pass_ids)))
+
+    # Clean up associated satellite passes, predictions, alerts, reports, pipeline jobs
+    await db.execute(delete(SatellitePass).where(SatellitePass.aoi_id == aoi_id))
+    await db.execute(delete(YieldPrediction).where(YieldPrediction.aoi_id == aoi_id))
+    await db.execute(delete(Alert).where(Alert.aoi_id == aoi_id))
+    await db.execute(delete(Report).where(Report.aoi_id == aoi_id))
+    await db.execute(delete(PipelineJob).where(PipelineJob.aoi_id == aoi_id))
+
+    # Delete AOI
+    await db.delete(aoi)
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": f"Farm plot #{aoi_id} ('{aoi.name}') deleted successfully.",
+        "deleted_id": aoi_id
+    }
 
 
 @router.get("/{aoi_id}/timeline", response_model=TimelineResponse)
