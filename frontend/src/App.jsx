@@ -172,7 +172,8 @@ export default function App() {
     const rpt = await api.generateReport(targetAoiId, personaTemplate, reportTitle, crop, currentLang);
 
     if (rpt && rpt.file_uri) {
-      const downloadUrl = rpt.file_uri.startsWith('http') ? rpt.file_uri : `http://localhost:8000${rpt.file_uri}`;
+      const origin = api.getApiOrigin ? api.getApiOrigin() : (window.location.origin.includes('localhost') ? 'http://localhost:8000' : window.location.origin);
+      const downloadUrl = rpt.file_uri.startsWith('http') ? rpt.file_uri : `${origin}${rpt.file_uri}`;
       setNotificationToast(`Report ready! Starting download...`);
       
       const link = document.createElement('a');

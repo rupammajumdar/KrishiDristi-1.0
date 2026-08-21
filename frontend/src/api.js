@@ -5,7 +5,11 @@
  * Falls back to rich mock data when the backend is unreachable (offline / dev without server).
  */
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' && window.location.origin.includes('localhost') ? 'http://localhost:8000/api' : '/api');
+
+export function getApiOrigin() {
+  return API_BASE.replace(/\/api\/?$/, '');
+}
 
 // ─── Token Management ─────────────────────────────────────────────────────────
 const TokenStore = {
@@ -313,8 +317,9 @@ export const api = {
   },
 
   // ─── Index & Prediction API ───────────────────────────────────────────────────
-  async getIndexData(aoiId, indexType = 'NDVI') {
-    const res = await apiFetch(`/aois/${aoiId}/index?index_type=${indexType}`);
+  async getIndexData(aoiId, indexType = 'NDVI', passId = null) {
+    const query = passId ? `index_type=${indexType}&pass_id=${passId}` : `index_type=${indexType}`;
+    const res = await apiFetch(`/aois/${aoiId}/index?${query}`);
     if (res?.ok) return res.json();
 
     return {
@@ -530,15 +535,16 @@ export const api = {
     if (res?.ok) {
       const data = await res.json();
       if (data.file_uri && !data.file_uri.startsWith('http')) {
-        data.file_uri = `http://localhost:8000${data.file_uri}`;
+        data.file_uri = `${getApiOrigin()}${data.file_uri}`;
       }
       return data;
     }
 
+    const origin = getApiOrigin();
     return {
       id: Math.floor(Math.random() * 900) + 100,
       aoi_id: aoiId, persona_template: personaTemplate,
-      file_uri: `http://localhost:8000/api/reports/101/download`,
+      file_uri: `${origin}/api/reports/101/download`,
       report_title: title || `${personaTemplate.toUpperCase()} Audit Report`,
       status: 'completed',
       created_at: new Date().toISOString(),

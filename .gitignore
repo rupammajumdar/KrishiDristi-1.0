@@ -17,6 +17,13 @@ __pycache__/
 *.db
 backend/krishidristi.db
 
+# Secrets & Keys
+*.json
+!frontend/package.json
+!frontend/tsconfig.json
+backend/gee-key.json
+
 # Generated Artifacts
 backend/static/reports/*.pdf
 .DS_Store
+

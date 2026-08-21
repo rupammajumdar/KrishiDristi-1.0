@@ -591,7 +591,8 @@ export default function FarmerDashboard({
   const plotName = selectedAoi?.name || (currentLang === 'mr' ? 'माझे शेत' : currentLang === 'hi' ? 'मेरा खेत' : 'My Farm Plot');
   const areaHa = selectedAoi?.area_hectares || 2.02;
   const areaAc = (areaHa * 2.471).toFixed(1);
-  const locationStr = [selectedAoi?.village, selectedAoi?.district, selectedAoi?.state].filter(Boolean).join(', ') || 'Mantha, Jalna, Maharashtra';
+  const locationParts = Array.from(new Set([selectedAoi?.village, selectedAoi?.taluk, selectedAoi?.district, selectedAoi?.state].filter(p => p && p !== 'Local Field' && p !== 'Local Taluk' && p !== 'Unknown District')));
+  const locationStr = locationParts.length > 0 ? locationParts.join(', ') : (selectedAoi?.name || 'Active Farm Location');
 
   const changePct = prediction?.yield_change_pct || -21.8;
 

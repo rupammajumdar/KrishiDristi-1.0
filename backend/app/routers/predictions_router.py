@@ -91,8 +91,23 @@ async def predict_yield(
         if existing:
             return PredictionResponse.model_validate(existing)
 
-    # ── Step 1: Pull latest real NDVI / NDWI from DB ──────────────────────
+    # ── Step 1: Compute live Google Earth Engine NDVI / NDWI for the exact drawn geometry ──
+    from app.routers.aois_router import parse_geometry_to_geojson
     mean_ndvi, mean_ndwi = await _get_latest_index_values(aoi_id, db)
+
+    if aoi.geometry:
+        try:
+            import asyncio
+            geom_dict = parse_geometry_to_geojson(aoi.geometry)
+            gee_ndvi = await asyncio.to_thread(satellite_engine._fetch_gee_statistics, geom_dict, "ndvi")
+            if gee_ndvi is not None:
+                mean_ndvi = round(gee_ndvi, 3)
+            
+            gee_ndwi = await asyncio.to_thread(satellite_engine._fetch_gee_statistics, geom_dict, "ndwi")
+            if gee_ndwi is not None:
+                mean_ndwi = round(gee_ndwi, 3)
+        except Exception as e:
+            print(f"[Prediction GEE Fetch Exception] {e}")
 
     # ── Step 2: Get real coordinates from geometry for weather lookup ──────
     lat, lon = 19.8341, 75.8812  # Jalna defaults

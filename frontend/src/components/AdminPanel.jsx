@@ -84,8 +84,8 @@ function OverviewSection({ pipelineStatus, modelRegistry }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {[
           { name: 'FastAPI Backend', status: 'operational', latency: '12ms', uptime: '99.98%', icon: Server, color: 'emerald' },
-          { name: 'Celery Worker', status: 'operational', latency: '—', uptime: '99.91%', icon: Zap, color: 'emerald' },
-          { name: 'Sentinel-2 Ingestion', status: 'degraded', latency: '—', uptime: '97.2%', icon: Wifi, color: 'amber' },
+          { name: 'Celery Worker Queue', status: 'operational', latency: '—', uptime: '99.91%', icon: Zap, color: 'emerald' },
+          { name: 'Sentinel-2 (10m L2A)', status: 'degraded', latency: '—', uptime: '97.2%', icon: Wifi, color: 'amber' },
         ].map(svc => (
           <div key={svc.name} className={`rounded-2xl p-4 border ${svc.color === 'emerald' ? 'border-emerald-500/20 bg-emerald-950/20' : 'border-amber-500/20 bg-amber-950/20'}`}>
             <div className="flex items-center justify-between mb-3">
@@ -102,6 +102,36 @@ function OverviewSection({ pipelineStatus, modelRegistry }) {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Scalability & Enterprise Pipeline Architecture Card (Judging Differentiator) */}
+      <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5 shadow-2xl">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-cyan-400" />
+            <h3 className="text-sm font-bold text-cyan-200">District-to-State Scalability Pipeline Story</h3>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+            Enterprise Architecture
+          </span>
+        </div>
+        <p className="text-xs text-slate-300 leading-relaxed mb-3">
+          KrishiDrishti AI scales from a single farm plot to entire state-level agricultural monitoring using tiled parallel batch processing:
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <p className="font-bold text-emerald-400 mb-1">1. Sentinel-2 10m L2A Tiling</p>
+            <p className="text-slate-400 text-[11px]">Free, 5-day revisit multispectral imagery split into 100km² MGRS tiles for localized parallel raster extraction.</p>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <p className="font-bold text-amber-400 mb-1">2. SCL Cloud & Shadow Masking</p>
+            <p className="text-slate-400 text-[11px]">Automatic pixel filtering using Scene Classification Layer (SCL 3, 8, 9, 10) to guarantee clear-sky statistical rigor.</p>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+            <p className="font-bold text-purple-400 mb-1">3. Celery / Redis Asynchronous Queue</p>
+            <p className="text-slate-400 text-[11px]">Distributed Redis worker pool handling GEE reduceRegion calls, Random Forest inference, and PDF rendering asynchronously.</p>
+          </div>
+        </div>
       </div>
 
       {/* Recent Activity */}

@@ -174,29 +174,38 @@ async def download_report_pdf(
     """Download the generated PDF report."""
     res = await db.execute(select(Report).where(Report.id == report_id))
     rpt = res.scalar_one_or_none()
-    if not rpt or not rpt.file_uri:
-        # Fallback to direct file search in reports dir
-        for fname in os.listdir(report_generator.REPORTS_DIR):
-            if f"report_{report_id}_" in fname and fname.endswith(".pdf"):
-                return FileResponse(
-                    path=os.path.join(report_generator.REPORTS_DIR, fname),
-                    filename=f"KrishiDrishti_Report_{report_id}.pdf",
-                    media_type="application/pdf"
-                )
-        raise HTTPException(status_code=404, detail="Report file not found")
 
-    rel_path = rpt.file_uri.lstrip("/static/reports/")
-    abs_path = os.path.join(report_generator.REPORTS_DIR, rel_path)
-    
-    if not os.path.exists(abs_path):
-        # Search in reports dir
-        for fname in os.listdir(report_generator.REPORTS_DIR):
-            if f"report_{report_id}_" in fname and fname.endswith(".pdf"):
-                abs_path = os.path.join(report_generator.REPORTS_DIR, fname)
+    possible_dirs = [
+        report_generator.REPORTS_DIR,
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static", "reports"),
+        os.path.join("/tmp", "reports")
+    ]
+
+    found_path = None
+
+    if rpt and rpt.file_uri:
+        rel_path = rpt.file_uri.split("/reports/")[-1]
+        for pdir in possible_dirs:
+            candidate = os.path.join(pdir, rel_path)
+            if os.path.exists(candidate):
+                found_path = candidate
                 break
 
+    if not found_path:
+        for pdir in possible_dirs:
+            if os.path.exists(pdir):
+                for fname in os.listdir(pdir):
+                    if f"report_{report_id}_" in fname and fname.endswith(".pdf"):
+                        found_path = os.path.join(pdir, fname)
+                        break
+            if found_path:
+                break
+
+    if not found_path:
+        raise HTTPException(status_code=404, detail="Report file not found")
+
     return FileResponse(
-        path=abs_path,
+        path=found_path,
         filename=f"KrishiDrishti_Report_{report_id}.pdf",
         media_type="application/pdf"
     )

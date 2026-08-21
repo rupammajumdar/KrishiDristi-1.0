@@ -293,7 +293,7 @@ async def geocode_location(q: str):
 
 async def reverse_geocode_coords(lat: float, lon: float) -> dict:
     """Reverse geocode latitude and longitude into precise village, taluk, district, state."""
-    # 1. Check closest predefined agricultural location (< 20km)
+    # 1. Fast match from predefined agricultural location dictionary
     import math
     min_d = 999.0
     best_match = None
@@ -303,20 +303,20 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
             min_d = d
             best_match = loc
 
-    if min_d < 0.15 and best_match:  # ~15km
+    if best_match and min_d < 0.15:  # ~15km radius match
         return {
-            "name": best_match["name"],
+            "name": f"Farm near {best_match['name']}",
             "village": best_match["name"].split(',')[0].strip(),
-            "taluk": best_match.get("district", best_match["name"].split(',')[0].strip()),
-            "district": best_match.get("district", "Jalna"),
+            "taluk": best_match.get("district", "Local Taluk"),
+            "district": best_match.get("district", "Local District"),
             "state": best_match.get("state", "Maharashtra")
         }
 
-    # 2. Query Nominatim reverse geocoder
+    # 2. Query Nominatim real-time reverse geocoder with short 1.0s timeout
     try:
         import httpx
         headers = {"User-Agent": "KrishiDrishti-AI/1.0 (Agriculture Platform)"}
-        async with httpx.AsyncClient(timeout=4.0) as client:
+        async with httpx.AsyncClient(timeout=1.0) as client:
             resp = await client.get(
                 f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json",
                 headers=headers
@@ -324,9 +324,19 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
             if resp.status_code == 200:
                 data = resp.json()
                 addr = data.get("address", {})
-                village = addr.get("village") or addr.get("suburb") or addr.get("town") or addr.get("city") or addr.get("road") or "Farm Plot"
-                taluk = addr.get("county") or addr.get("subdistrict") or village
-                district = addr.get("state_district") or addr.get("district") or addr.get("city") or taluk
+                village = (
+                    addr.get("village") or addr.get("suburb") or addr.get("town") or 
+                    addr.get("city_district") or addr.get("city") or addr.get("hamlet") or 
+                    addr.get("road") or f"Plot ({lat:.2f}, {lon:.2f})"
+                )
+                taluk = (
+                    addr.get("county") or addr.get("subdistrict") or addr.get("tehsil") or 
+                    addr.get("taluk") or village
+                )
+                district = (
+                    addr.get("state_district") or addr.get("district") or addr.get("county") or 
+                    addr.get("city") or taluk
+                )
                 state = addr.get("state") or "Maharashtra"
                 return {
                     "name": data.get("display_name", f"Farm Plot ({lat:.3f}, {lon:.3f})"),
@@ -335,15 +345,15 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
                     "district": district,
                     "state": state
                 }
-    except Exception:
+    except Exception as err:
         pass
 
     if best_match:
         return {
             "name": f"Farm near {best_match['name']}",
             "village": best_match["name"].split(',')[0].strip(),
-            "taluk": best_match.get("district", "Jalna"),
-            "district": best_match.get("district", "Jalna"),
+            "taluk": best_match.get("district", "Local Taluk"),
+            "district": best_match.get("district", "Local District"),
             "state": best_match.get("state", "Maharashtra")
         }
 
@@ -351,7 +361,7 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
         "name": f"Farm Plot ({lat:.3f}, {lon:.3f})",
         "village": "Local Field",
         "taluk": "Local Taluk",
-        "district": "Unknown District",
+        "district": "Local District",
         "state": "Maharashtra"
     }
 

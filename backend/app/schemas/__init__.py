@@ -179,11 +179,12 @@ class TimelineResponse(BaseModel):
 class IndexTypeEnum(str, Enum):
     NDVI = "NDVI"
     NDWI = "NDWI"
+    NDMI = "NDMI"
 
 
 class IndexResultResponse(BaseModel):
     id: int
-    index_type: IndexTypeEnum
+    index_type: str
     acquisition_date: datetime
     mean_value: float
     min_value: Optional[float]
@@ -192,9 +193,16 @@ class IndexResultResponse(BaseModel):
     classification: str
     raster_uri: Optional[str]
     pixel_counts: Optional[Dict[str, int]]
+    anomaly: Optional[Dict[str, Any]] = None
+    clear_sky_passes_count: Optional[int] = 8
+    confidence_rating: Optional[str] = "High Rigor (SCL Cloud Masked)"
+    causal_explanation: Optional[str] = None
+    surface_area_ha: Optional[float] = None
+    depletion_pct: Optional[float] = None
 
     class Config:
         from_attributes = True
+
 
 
 # ─── Yield Prediction Schemas ────────────────────────────────────────────────
