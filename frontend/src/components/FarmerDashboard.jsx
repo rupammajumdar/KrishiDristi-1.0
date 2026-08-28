@@ -466,21 +466,16 @@ export default function FarmerDashboard({
   const [isCropDropdownOpen, setIsCropDropdownOpen] = useState(false);
   const [isPlotManagerOpen, setIsPlotManagerOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-
-  // Available native languages
-  const nativeLanguages = [
-    { code: 'mr', label: 'मराठी', flag: '🇮🇳', region: 'Maharashtra' },
-    { code: 'hi', label: 'हिन्दी', flag: '🇮🇳', region: 'North/Central' },
-    { code: 'en', label: 'English', flag: '🌐', region: 'Global' },
-    { code: 'kn', label: 'ಕನ್ನಡ', flag: '🇮🇳', region: 'Karnataka' },
-    { code: 'te', label: 'తెలుగు', flag: '🇮🇳', region: 'Andhra/Telangana' },
-  ];
-
-  // Resolve current active crop from selected plot
   const [selectedCropKey, setSelectedCropKey] = useState(null);
   const [localPrediction, setLocalPrediction] = useState(prediction);
   const [isRunningML, setIsRunningML] = useState(false);
   const [mlToastMessage, setMlToastMessage] = useState(null);
+  const [completedTasksByPlot, setCompletedTasksByPlot] = useState({});
+  const [aiTasks, setAiTasks] = useState(null);
+  const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState(null);
+  const [isAskingAi, setIsAskingAi] = useState(false);
 
   // Sync prediction when props update
   useEffect(() => {
@@ -581,8 +576,6 @@ export default function FarmerDashboard({
 
   // Keyed task completion state per plot/location ID so tasks reset properly on plot change
   const plotKey = selectedAoi?.id || selectedAoi?.name || 'default_plot';
-  const [completedTasksByPlot, setCompletedTasksByPlot] = useState({});
-
   const completedTasks = completedTasksByPlot[plotKey] || {};
 
   const toggleTask = (id) => {
@@ -625,12 +618,6 @@ export default function FarmerDashboard({
   const isHealthy = healthScore >= 75;
   const isModerateRisk = healthScore >= 50 && healthScore < 75;
   const isHighRisk = healthScore < 50;
-
-  const [aiTasks, setAiTasks] = useState(null);
-  const [isLoadingAi, setIsLoadingAi] = useState(false);
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiAnswer, setAiAnswer] = useState(null);
-  const [isAskingAi, setIsAskingAi] = useState(false);
 
   // Fetch Real-Time Google Gemini AI Advisory whenever plot, crop, or language changes
   useEffect(() => {
