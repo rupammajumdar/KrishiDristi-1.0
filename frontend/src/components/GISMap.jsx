@@ -273,24 +273,32 @@ export default function GISMap({
     const avgLng = lngSum / points.length;
 
     // Live Reverse Geocode exact location
-    let geo = { village: 'Mantha', taluk: 'Mantha', district: 'Jalna', state: 'Maharashtra' };
+    let geo = null;
     try {
       geo = await api.reverseGeocode(avgLat, avgLng);
-    } catch (_) {}
+    } catch (_) {
+      geo = null;
+    }
 
-    const rawVillage = geo.village || geo.taluk || 'Mantha';
-    const districtName = geo.district || 'Jalna';
-    const villageName = (rawVillage === 'Field Plot' || rawVillage === 'Local Field' || rawVillage === 'Local Area') ? districtName : rawVillage;
-    const stateName = geo.state || 'Maharashtra';
-    const plotTitle = `Farm at ${villageName}, ${districtName}`;
+    const fallbackLabel = `Plot (${avgLat.toFixed(4)}, ${avgLng.toFixed(4)})`;
+    const isUnknown = !geo || geo.district === 'Unknown District' || geo.district === 'Unknown Taluk';
+    const rawVillage = geo?.village || geo?.taluk || fallbackLabel;
+    const districtName = geo?.district || 'Unknown District';
+    const villageName = (rawVillage === 'Field Plot' || rawVillage === 'Local Field' || rawVillage === 'Local Area' || rawVillage === 'Unknown District' || rawVillage === 'Unknown Taluk')
+      ? (isUnknown ? fallbackLabel : (districtName === 'Unknown District' ? fallbackLabel : districtName))
+      : rawVillage;
+    const stateName = geo?.state || 'India';
+    const plotTitle = isUnknown
+      ? `Farm Plot (${avgLat.toFixed(4)}, ${avgLng.toFixed(4)})`
+      : `Farm at ${villageName}, ${districtName}`;
 
     onAddAoi({
       name: plotTitle,
       geometry: newGeoJSON,
       aoi_type: "farm",
       crop_type: selectedAoi?.crop_type || "cotton",
-      district: districtName,
-      taluk: geo.taluk || districtName,
+      district: districtName === 'Unknown District' ? fallbackLabel : districtName,
+      taluk: geo?.taluk || districtName,
       village: villageName,
       state: stateName
     });
@@ -345,8 +353,8 @@ export default function GISMap({
     ];
     const placeParts = item.name.split(',');
     const placeName = placeParts[0].trim() || 'Selected Location';
-    const districtName = item.district || (placeParts.length > 1 ? placeParts[1].trim() : 'Jalna');
-    const stateName = item.state || 'Maharashtra';
+    const districtName = item.district || (placeParts.length > 1 ? placeParts[1].trim() : `${item.lat.toFixed(3)}, ${item.lng.toFixed(3)}`);
+    const stateName = item.state || 'India';
     
     const newAoi = {
       name: `Plot at ${placeName}`,

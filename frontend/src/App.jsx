@@ -118,8 +118,8 @@ export default function App() {
     return {
       lat: centroid?.lat,
       lon: centroid?.lon,
-      district: aoi?.district || 'Jalna',
-      state: aoi?.state || 'Maharashtra',
+      district: aoi?.district || aoi?.name || 'Unknown District',
+      state: aoi?.state || 'India',
       village: aoi?.village || aoi?.name || '',
       areaHa: aoi?.area_hectares || 2.0,
     };

@@ -228,18 +228,31 @@ export const api = {
 
     if (!created) {
       console.warn('[API] Using offline AOI create fallback');
+      // Derive a coordinate label if the caller didn't supply a real location,
+      // so we never silently fall back to a fixed (Jalna) district.
+      let coordLabel = '';
+      try {
+        const ring = aoiData?.geometry?.coordinates?.[0] || [];
+        if (ring.length > 0) {
+          let lngSum = 0, latSum = 0;
+          ring.forEach(c => { lngSum += Number(c[0]); latSum += Number(c[1]); });
+          coordLabel = `${(latSum / ring.length).toFixed(4)}, ${(lngSum / ring.length).toFixed(4)}`;
+        }
+      } catch (_) {}
+      const fallbackLoc = coordLabel ? `Plot (${coordLabel})` : 'Unknown Location';
+
       created = {
         id: Date.now(),
         owner_id: 101,
-        name: aoiData.name || 'Drawn Farm Polygon',
+        name: aoiData.name || `Drawn Farm Polygon (${coordLabel || 'geo'})`,
         geometry: aoiData.geometry,
         aoi_type: aoiData.aoi_type || 'farm',
         crop_type: aoiData.crop_type || 'cotton',
         area_hectares: aoiData.area_hectares || 2.5,
-        district: aoiData.district || 'Jalna',
-        taluk: aoiData.taluk || 'Jalna',
-        village: aoiData.village || 'Mantha',
-        state: 'Maharashtra',
+        district: aoiData.district || fallbackLoc,
+        taluk: aoiData.taluk || aoiData.district || fallbackLoc,
+        village: aoiData.village || fallbackLoc,
+        state: aoiData.state || 'India',
         is_active: true,
         created_at: new Date().toISOString(),
       };
@@ -387,8 +400,8 @@ export const api = {
     const crop = (cropType || 'cotton').toLowerCase();
     const lat = parseFloat(extraContext.lat) || 19.8341;
     const lon = parseFloat(extraContext.lon) || 75.8812;
-    const district = extraContext.district || 'Jalna';
-    const state = extraContext.state || 'Maharashtra';
+    const district = extraContext.district || 'Unknown District';
+    const state = extraContext.state || 'India';
     const rawV = extraContext.village || 'Mantha';
     const village = (rawV === 'My Location' || rawV === 'Field Plot' || rawV === 'Local Area') ? district : rawV;
 
@@ -460,6 +473,26 @@ export const api = {
     else if (state.toLowerCase().includes('chhattisgarh')) kvkStation = `IGKV / KVK ${district}`;
     else if (state.toLowerCase().includes('karnataka')) kvkStation = `UAS / KVK ${district}`;
     else if (state.toLowerCase().includes('punjab')) kvkStation = `PAU / KVK ${district}`;
+    else if (state.toLowerCase().includes('telangana')) kvkStation = `PJTSAU / KVK ${district}`;
+    else if (state.toLowerCase().includes('rajasthan')) kvkStation = `SKNAU / KVK ${district}`;
+    else if (state.toLowerCase().includes('madhya pradesh')) kvkStation = `RVSKVV / KVK ${district}`;
+    else if (state.toLowerCase().includes('uttar pradesh')) kvkStation = `ANDUAT / KVK ${district}`;
+    else if (state.toLowerCase().includes('gujarat')) kvkStation = `AAU / KVK ${district}`;
+    else if (state.toLowerCase().includes('bihar')) kvkStation = `BAMETI / KVK ${district}`;
+
+    // State-aware dominant soil profile used by the advisory engine
+    const sState = (state || '').toLowerCase();
+    let soilType = 'Deep Black Cotton Soil (Vertisols)';
+    if (sState.includes('karnataka') || sState.includes('telangana')) soilType = 'Red Sandy Loam (Alfisols)';
+    else if (sState.includes('punjab') || sState.includes('haryana') || sState.includes('uttar pradesh')) soilType = 'Alluvial Loam (Inceptisols)';
+    else if (sState.includes('rajasthan')) soilType = 'Arid Sandy Soil (Aridisols)';
+    else if (sState.includes('chhattisgarh')) soilType = 'Red & Yellow Lateritic Soil';
+    else if (sState.includes('madhya pradesh') || sState.includes('gujarat')) soilType = 'Black Regur Cotton Soil (Vertisols)';
+    else if (sState.includes('bihar')) soilType = 'Alluvial Clay Loam (Gangetic Plains)';
+
+    const exactLocation = (village && village !== 'Unknown District' && village !== 'Unknown Taluk')
+      ? `${village}, ${district}, ${state}`
+      : `Lat ${lat.toFixed(4)}, Lon ${lon.toFixed(4)} (${district}, ${state})`;
 
     return {
       id: Math.floor(Math.random() * 800) + 100,
@@ -522,9 +555,10 @@ export const api = {
         district,
         state,
         village,
-        agro_zone: `${district} Agro-Climatic Zone`,
-        soil_type: 'Deep Black Cotton Soil (Vertisols)',
-        kvk_station: `VNMKV Parbhani / KVK ${district}`,
+        full_location: exactLocation,
+        agro_zone: `${village || district} · ${district} Agro-Climatic Zone`,
+        soil_type: soilType,
+        kvk_station: kvkStation,
         drought_vulnerability: 'Moderate to High',
         regional_modifier: 0.96,
       },
@@ -538,8 +572,8 @@ export const api = {
       lat = 19.8341,
       lon = 75.8812,
       cropType = 'cotton',
-      district = 'Jalna',
-      state = 'Maharashtra',
+      district = 'Unknown District',
+      state = 'India',
       village = null,
       areaHa = 2.0,
       ndvi = 0.48,
@@ -580,8 +614,8 @@ export const api = {
       lat = 19.8341,
       lon = 75.8812,
       cropType = 'cotton',
-      district = 'Jalna',
-      state = 'Maharashtra',
+      district = 'Unknown District',
+      state = 'India',
       village = null,
       areaHa = 2.0,
       ndvi = 0.48,
@@ -842,7 +876,7 @@ export const api = {
       { name: 'Raipur', taluk: 'Raipur', district: 'Raipur', state: 'Chhattisgarh', lat: 21.2514, lon: 81.6296, r: 0.8 }
     ];
 
-    let closest = regions[0];
+    let closest = null;
     let minDiff = Infinity;
     for (const r of regions) {
       const dist = Math.hypot(latNum - r.lat, lonNum - r.lon);
@@ -852,13 +886,26 @@ export const api = {
       }
     }
 
-    const vName = minDiff <= (closest.r || 0.5) ? closest.name : `Plot (${latNum.toFixed(3)}, ${lonNum.toFixed(3)})`;
+    // Only reuse a known region's identity when the point is actually inside it.
+    // Otherwise fall back to the exact coordinate label so we never mislabel
+    // an unknown location as its nearest (often Jalna) region.
+    if (closest && minDiff <= (closest.r || 0.5)) {
+      return {
+        name: `Farm at ${closest.name}, ${closest.district}`,
+        village: closest.name,
+        taluk: closest.taluk,
+        district: closest.district,
+        state: closest.state
+      };
+    }
+
+    const coordLabel = `${latNum.toFixed(4)}, ${lonNum.toFixed(4)}`;
     return {
-      name: `Farm at ${vName}, ${closest.district}`,
-      village: vName,
-      taluk: closest.taluk,
-      district: closest.district,
-      state: closest.state
+      name: `Farm Plot (${coordLabel})`,
+      village: `Plot (${coordLabel})`,
+      taluk: 'Unknown Taluk',
+      district: 'Unknown District',
+      state: 'India'
     };
   },
 

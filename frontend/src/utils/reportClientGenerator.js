@@ -9,8 +9,8 @@ export function downloadClientReport({ aoi, persona = 'farmer', crop = 'cotton',
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
-  const aoiName = aoi?.name || `Farm Plot (${aoi?.village || 'Jalna'})`;
-  const locationStr = `${aoi?.village || 'Mantha'}, ${aoi?.taluk || 'Jalna'}, ${aoi?.district || 'Jalna'}, ${aoi?.state || 'Maharashtra'}`;
+  const aoiName = aoi?.name || `Farm Plot (${aoi?.village || aoi?.district || 'Unknown Location'})`;
+  const locationStr = [aoi?.village, aoi?.taluk, aoi?.district, aoi?.state].filter(Boolean).join(', ') || (aoi?.name || 'Unknown Location');
   const areaHa = aoi?.area_hectares || 2.45;
   const areaAc = (areaHa * 2.471).toFixed(1);
 

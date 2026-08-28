@@ -102,15 +102,15 @@ const CROPS_DATABASE = {
  * 4. Regional Agro-Climatic Zone & Soil profile
  */
 function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
-  const district = aoi?.district || 'Jalna';
-  const rawVillage = aoi?.village || aoi?.taluk || 'Mantha';
-  const village = (rawVillage === 'Field Plot' || rawVillage === 'Local Field' || rawVillage === 'Local Area') ? district : rawVillage;
-  const state = aoi?.state || 'Maharashtra';
+  const locCtx = prediction?.location_context || prediction?.input_snapshot_json?.location_context;
+  const district = aoi?.district || locCtx?.district || 'Unknown District';
+  const rawVillage = aoi?.village || aoi?.taluk || locCtx?.village || district;
+  const village = (rawVillage === 'Field Plot' || rawVillage === 'Local Field' || rawVillage === 'Local Area' || rawVillage === 'Unknown District' || rawVillage === 'Unknown Taluk') ? district : rawVillage;
+  const state = aoi?.state || locCtx?.state || 'India';
 
   // Extract Exact ML Model Outputs
   const rfInfo = prediction?.ml_stress_classification || prediction?.input_snapshot_json?.rf_stress_classification;
   const lstmInfo = prediction?.ml_anomaly || prediction?.input_snapshot_json?.lstm_anomaly_detection;
-  const locCtx = prediction?.location_context || prediction?.input_snapshot_json?.location_context;
 
   const changePct = prediction?.yield_change_pct ?? -18.4;
   const temp = prediction?.input_snapshot_json?.temp_avg_c ?? 29.5;
@@ -130,7 +130,7 @@ function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
   const anomalyStatus = lstmInfo?.status_text || (isAnomalyDetected ? 'Temporal Anomaly Detected (Rapid Decline)' : 'Normal Trajectory');
 
   const zoneName = locCtx?.agro_zone || `${district} Agro-Climatic Zone`;
-  const soilType = locCtx?.soil_type || 'Black Vertisol Soil';
+  const soilType = locCtx?.soil_type || 'Regional Soil Profile';
   const kvkHub = locCtx?.kvk_station || `KVK ${district}`;
 
   const rawTasks = [];
@@ -489,9 +489,9 @@ export default function FarmerDashboard({
         lat,
         lon,
         cropType: activeCropKey,
-        district: selectedAoi.district || 'Jalna',
-        state: selectedAoi.state || 'Maharashtra',
-        village: selectedAoi.village || 'Mantha',
+        district: selectedAoi.district || 'Unknown District',
+        state: selectedAoi.state || 'India',
+        village: selectedAoi.village,
         areaHa: selectedAoi.area_hectares || 2.0,
         ndvi: newNdvi,
         ndwi: newNdwi,
@@ -602,8 +602,8 @@ export default function FarmerDashboard({
         const pred = await api.predictYield(selectedAoi.id || 0, cropId, {
           lat: centroidLat,
           lon: centroidLon,
-          district: selectedAoi.district || 'Jalna',
-          state: selectedAoi.state || 'Maharashtra',
+          district: selectedAoi.district || 'Unknown District',
+          state: selectedAoi.state || 'India',
           village: selectedAoi.village,
           areaHa: selectedAoi.area_hectares || 2.0,
         });
@@ -1119,7 +1119,7 @@ export default function FarmerDashboard({
                   </span>
                 </div>
                 <p className="text-xs font-bold text-slate-200 mt-2 truncate">
-                  {mlLocCtx?.agro_zone || `${selectedAoi.district || 'Jalna'} Agro-Zone`}
+                  {mlLocCtx?.agro_zone || `${selectedAoi?.district || selectedAoi?.name || ''} Agro-Zone`}
                 </p>
               </div>
 
