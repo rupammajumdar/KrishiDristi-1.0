@@ -101,7 +101,7 @@ const CROPS_DATABASE = {
  * 3. OpenWeather real-time weather (temp, rainfall)
  * 4. Regional Agro-Climatic Zone & Soil profile
  */
-function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
+function generateLocationAwareTasks({ aoi, prediction, cropKey, lang, healthScore, changePct: changePctArg, rawNdvi: rawNdviArg }) {
   const locCtx = prediction?.location_context || prediction?.input_snapshot_json?.location_context;
   const district = aoi?.district || locCtx?.district || 'Unknown District';
   const rawVillage = aoi?.village || aoi?.taluk || locCtx?.village || district;
@@ -112,17 +112,22 @@ function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
   const rfInfo = prediction?.ml_stress_classification || prediction?.input_snapshot_json?.rf_stress_classification;
   const lstmInfo = prediction?.ml_anomaly || prediction?.input_snapshot_json?.lstm_anomaly_detection;
 
-  const changePct = prediction?.yield_change_pct ?? -18.4;
+  const changePct = changePctArg ?? prediction?.yield_change_pct ?? -18.4;
   const temp = prediction?.input_snapshot_json?.temp_avg_c ?? 29.5;
   const rainfall = prediction?.input_snapshot_json?.rainfall_mm ?? 360;
   const ndwi = prediction?.input_snapshot_json?.mean_ndwi ?? -0.15;
-  const ndvi = prediction?.input_snapshot_json?.mean_ndvi ?? 0.46;
+  const ndvi = rawNdviArg ?? prediction?.input_snapshot_json?.mean_ndvi ?? 0.46;
+
+  // The risk level is driven by the SAME health score shown on the dashboard
+  // gauge, so the advisory tasks always match the score the farmer sees.
+  const scoreNow = healthScore != null ? healthScore : Math.max(15, Math.min(98, Math.round((((ndvi - 0.15) / 0.6) * 75 + 25) * 0.55 + (75 + changePct) * 0.45)));
+  const riskLevel = scoreNow >= 75 ? 'healthy' : scoreNow >= 50 ? 'moderate' : 'severe';
+  const isSevereStress = riskLevel === 'severe';
+  const isModerateStress = riskLevel === 'moderate';
+  const isHealthyVeg = riskLevel === 'healthy';
 
   // ML Stress Classification Flags (0 = Healthy, 1 = Moderate Stress, 2 = Severe Stress)
-  const stressLabel = rfInfo?.stress_label || (changePct <= -20.0 ? 'Severe Moisture Stress' : changePct >= 0 ? 'Healthy / Optimal Vigor' : 'Moderate Stress');
-  const isSevereStress = rfInfo?.stress_class_id === 2 || (rfInfo?.probabilities?.severe_stress ?? 0) >= 0.35 || changePct <= -20.0;
-  const isModerateStress = rfInfo?.stress_class_id === 1 || (rfInfo?.probabilities?.moderate_stress ?? 0) >= 0.40;
-  const isHealthyVeg = rfInfo?.stress_class_id === 0 || (rfInfo?.probabilities?.healthy ?? 0) >= 0.60;
+  const stressLabel = rfInfo?.stress_label || (isSevereStress ? 'Severe Moisture Stress' : isHealthyVeg ? 'Healthy / Optimal Vigor' : 'Moderate Stress');
 
   // LSTM Anomaly Flags
   const anomalyScore = lstmInfo?.anomaly_score ?? (changePct <= -20.0 ? 0.45 : 0.18);
@@ -547,13 +552,35 @@ export default function FarmerDashboard({
     }));
   };
 
+  // Compute the plot's health score & risk level FIRST so the generated
+  // advisory tasks always match the exact score/status shown on the gauge.
+  const changePct = activePrediction?.yield_change_pct ?? -21.8;
+  const rawNdvi = activePrediction?.input_snapshot_json?.mean_ndvi ?? 0.48;
+  const ndviHealth = Math.max(20, Math.min(95, Math.round(((rawNdvi - 0.15) / (0.75 - 0.15)) * 75 + 20)));
+  const yieldHealth = Math.max(20, Math.min(95, Math.round(75 + changePct)));
+  const baseHealth = Math.round(ndviHealth * 0.55 + yieldHealth * 0.45);
+
   // Generate dynamic, location-aware & weather-adaptive tasks
+  // (recovery bonus is applied after task list is built; pass 0 here)
   const locationAgroProfile = generateLocationAwareTasks({
     aoi: selectedAoi,
     prediction: activePrediction,
     cropKey: activeCropKey,
-    lang: currentLang
+    lang: currentLang,
+    healthScore: Math.max(15, Math.min(98, baseHealth)),
+    changePct: changePct,
+    rawNdvi: rawNdvi
   });
+  const baseHealthScore = Math.max(15, Math.min(98, baseHealth));
+
+  const completedCount = Object.values(completedTasks).filter(Boolean).length;
+  const totalTasks = locationAgroProfile.tasks.length || 3;
+  const taskRecoveryBonus = Math.round((completedCount / totalTasks) * 12); // Farmer gets visible recovery boost for completing tasks
+  const healthScore = Math.max(15, Math.min(98, baseHealthScore + taskRecoveryBonus));
+
+  const isHealthy = healthScore >= 75;
+  const isModerateRisk = healthScore >= 50 && healthScore < 75;
+  const isHighRisk = healthScore < 50;
 
   const [aiTasks, setAiTasks] = useState(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
@@ -644,8 +671,6 @@ export default function FarmerDashboard({
   const locationParts = Array.from(new Set([selectedAoi?.village, selectedAoi?.taluk, selectedAoi?.district, selectedAoi?.state].filter(p => p && p !== 'Local Field' && p !== 'Local Taluk' && p !== 'Unknown District' && p !== 'Field Plot' && p !== 'Farm Plot' && p !== 'Local Area')));
   const locationStr = locationParts.length > 0 ? locationParts.join(', ') : (selectedAoi?.name || 'Active Farm Location');
 
-  const changePct = activePrediction?.yield_change_pct ?? -21.8;
-
   // ML Fields Extraction
   const mlRfInfo = activePrediction?.ml_stress_classification || activePrediction?.input_snapshot_json?.rf_stress_classification;
   const mlLstmInfo = activePrediction?.ml_anomaly || activePrediction?.input_snapshot_json?.lstm_anomaly_detection;
@@ -659,20 +684,7 @@ export default function FarmerDashboard({
   const estEarningsInr = Math.round(parseFloat(totalEstQuintals) * cropConfig.mspPerQtl).toLocaleString('en-IN');
 
   // Dynamic Sentinel-2 NDVI + Yield + Action Recovery Health Score (0-100)
-  const rawNdvi = activePrediction?.input_snapshot_json?.mean_ndvi ?? 0.48;
-  const completedCount = Object.values(completedTasks).filter(Boolean).length;
-  const totalTasks = tasksList.length || 3;
-  const taskRecoveryBonus = Math.round((completedCount / totalTasks) * 12); // Farmer gets visible recovery boost for completing tasks
-
-  // NDVI score (0.2 -> 25%, 0.75+ -> 95%)
-  const ndviHealth = Math.max(20, Math.min(95, Math.round(((rawNdvi - 0.15) / (0.75 - 0.15)) * 75 + 20)));
-  const yieldHealth = Math.max(20, Math.min(95, Math.round(75 + changePct)));
-  const baseHealth = Math.round(ndviHealth * 0.55 + yieldHealth * 0.45);
-  const healthScore = Math.max(15, Math.min(98, baseHealth + taskRecoveryBonus));
-
-  const isHealthy = healthScore >= 75;
-  const isModerateRisk = healthScore >= 50 && healthScore < 75;
-  const isHighRisk = healthScore < 50;
+  // (baseHealth/healthScore already computed above, before tasks were generated)
 
   const ndviTrendData = [
     { date: '10 Jul', health: Math.max(25, Math.min(92, Math.round(healthScore + 18 - taskRecoveryBonus))), label: 'Early' },
