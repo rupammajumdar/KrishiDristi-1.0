@@ -333,23 +333,43 @@ async def get_ai_advisory(
 
     # Get real coordinates
     lat, lon = 19.8341, 75.8812
+    geom_dict = None
     try:
         from shapely.geometry import shape
         import shapely.wkt
+        import json
         if aoi.geometry:
             geom_str = str(aoi.geometry).split(";")[-1].strip()
             geom_shape = shape(json.loads(geom_str)) if geom_str.startswith("{") else shapely.wkt.loads(geom_str)
             lat, lon = geom_shape.centroid.y, geom_shape.centroid.x
+            # Also keep the raw geom dict for GEE
+            if geom_str.startswith("{"):
+                geom_dict = json.loads(geom_str)
     except Exception:
         pass
+
+    # Try live GEE/Sentinel fetch to get the most recent NDVI/NDWI for this geometry
+    if geom_dict:
+        try:
+            import asyncio
+            gee_ndvi = await asyncio.to_thread(satellite_engine._fetch_gee_statistics, geom_dict, "ndvi")
+            if gee_ndvi is not None:
+                mean_ndvi = round(gee_ndvi, 3)
+            gee_ndwi = await asyncio.to_thread(satellite_engine._fetch_gee_statistics, geom_dict, "ndwi")
+            if gee_ndwi is not None:
+                mean_ndwi = round(gee_ndwi, 3)
+        except Exception as gee_err:
+            print(f"[Advisory GEE fetch skipped] {gee_err}")
 
     # Real OpenWeather data
     rain_mm, temp_c = ml_engine.fetch_live_weather(lat, lon)
 
-    crop = (crop_type or (aoi.crop_type.value if aoi.crop_type else "cotton")).lower()
+    # Use the requested crop_type from the query parameter (not the stored AOI crop_type).
+    # This is critical: when the farmer changes crop in the UI, the new crop must be used here.
+    crop = (crop_type or (aoi.crop_type.value if aoi.crop_type else "cotton")).lower().strip()
     area = aoi.area_hectares or 2.5
 
-    # Run ML Model Inference for Real-Time Advisory
+    # Run ML Model Inference for Real-Time Advisory with the REQUESTED crop
     ml_pred = ml_engine.predict_yield(
         mean_ndvi=mean_ndvi,
         mean_ndwi=mean_ndwi,

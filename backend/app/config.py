@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # Google Gemini AI
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-3.1-flash-lite"
+    GEMINI_MODEL: str = "gemini-1.5-flash-latest"
 
     # OpenWeather (current + 5-day forecast)
     OPENWEATHER_API_KEY: Optional[str] = None

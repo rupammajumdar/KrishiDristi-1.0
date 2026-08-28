@@ -456,8 +456,9 @@ export default function FarmerDashboard({
     }
   }, [selectedAoi?.id, selectedAoi?.crop_type]);
 
-  const rawCropKey = (selectedCropKey || selectedAoi?.crop_type || 'cotton').toLowerCase();
-  const activeCropKey = CROPS_DATABASE[rawCropKey] ? rawCropKey : 'cotton';
+  const rawCropKey = (selectedCropKey || selectedAoi?.crop_type || 'cotton').toLowerCase().trim();
+  // Only fallback to 'cotton' if the key genuinely doesn't exist in our database
+  const activeCropKey = (rawCropKey && CROPS_DATABASE[rawCropKey]) ? rawCropKey : 'cotton';
   const cropConfig = CROPS_DATABASE[activeCropKey] || CROPS_DATABASE.cotton;
 
   // Handler to run live ML Model prediction for the location using real-time map data
@@ -605,12 +606,16 @@ export default function FarmerDashboard({
   }, [selectedAoi?.id, activeCropKey, currentLang]);
 
   const handleSelectCrop = async (cropId) => {
+    // Immediately update local crop key so UI reflects change right away
     setSelectedCropKey(cropId);
-    setAiTasks(null);
+    setAiTasks(null); // Clear old tasks so new crop's tasks load fresh
     setIsLoadingAi(true);
-    if (onUpdateCrop && selectedAoi?.id) {
-      onUpdateCrop(selectedAoi.id, cropId);
+
+    // Propagate crop change up to App (updates selectedAoi in state & backend)
+    if (onUpdateCrop) {
+      onUpdateCrop(cropId);
     }
+
     try {
       if (selectedAoi) {
         // Derive the field centroid so the prediction uses THIS plot's real coordinates
@@ -626,6 +631,7 @@ export default function FarmerDashboard({
           }
         } catch (_) {}
 
+        // Run ML prediction with the NEW crop type
         const pred = await api.predictYield(selectedAoi.id || 0, cropId, {
           lat: centroidLat,
           lon: centroidLon,
@@ -636,10 +642,14 @@ export default function FarmerDashboard({
         });
         if (pred) setLocalPrediction(pred);
 
-        const res = await api.getAiAdvisory(selectedAoi.id || 1, cropId, currentLang);
+        // Try to get Gemini advisory for the new crop — use AOI id if available
+        const advisoryAoiId = selectedAoi.id || 1;
+        const res = await api.getAiAdvisory(advisoryAoiId, cropId, currentLang);
         if (res?.tasks && Array.isArray(res.tasks) && res.tasks.length > 0) {
           setAiTasks(res.tasks);
         }
+        // If Gemini advisory fails, aiTasks stays null and the component
+        // will fall back to locationAgroProfile tasks (computed live from activeCropKey)
       }
     } catch (e) {
       console.error('Error updating crop prediction and AI advisory:', e);
@@ -650,10 +660,12 @@ export default function FarmerDashboard({
 
   const handleAskGemini = async (e) => {
     if (e) e.preventDefault();
-    if (!aiQuestion.trim() || !selectedAoi?.id) return;
+    if (!aiQuestion.trim()) return;
+    // Allow asking even for new plots that don't have a numeric DB id yet
+    const effectiveAoiId = selectedAoi?.id || 1;
     setIsAskingAi(true);
     try {
-      const res = await api.askAi(selectedAoi.id, aiQuestion, activeCropKey, currentLang);
+      const res = await api.askAi(effectiveAoiId, aiQuestion, activeCropKey, currentLang);
       setAiAnswer(res?.answer || 'AI Agronomist analysis complete.');
     } catch (err) {
       setAiAnswer('Unable to reach AI agronomist at the moment. Please try again.');
@@ -662,7 +674,9 @@ export default function FarmerDashboard({
     }
   };
 
-  // Live ML-Driven Action Tasks (reacts directly to activePrediction, cropKey, and location telemetry)
+  // Live ML-Driven Action Tasks:
+  // Priority: Gemini AI tasks (if loaded and matching current crop) > locationAgroProfile tasks
+  // aiTasks come from Gemini and are crop-specific; locationAgroProfile is always computed fresh from activeCropKey
   const tasksList = locationAgroProfile.tasks;
 
   const plotName = selectedAoi?.name || (currentLang === 'mr' ? 'माझे शेत' : currentLang === 'hi' ? 'मेरा खेत' : 'My Farm Plot');
@@ -1227,47 +1241,96 @@ export default function FarmerDashboard({
 
         {/* Task Cards List */}
         <div className="space-y-2.5">
-          {tasksList.map((task) => {
-            const isDone = completedTasks[task.id];
-            const Icon = task.icon || Sprout;
-            return (
-              <div 
-                key={task.id}
-                onClick={() => toggleTask(task.id)}
-                className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-                  isDone 
-                    ? 'bg-slate-900/40 border-slate-800 text-slate-500 line-through opacity-70' 
-                    : task.urgent
-                    ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500/70 shadow-sm shadow-rose-950/40'
-                    : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/40'
-                }`}
-              >
-                <button className="mt-0.5 flex-shrink-0 text-emerald-400">
-                  {isDone ? <CheckSquare className="w-5 h-5 text-emerald-400" /> : <Square className="w-5 h-5 text-slate-400" />}
-                </button>
-                <div className="flex-1 min-w-0 flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                      {task.badge}
-                    </span>
-                    {task.urgent && !isDone && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                        {t.urgentBadge}
+          {/* Gemini AI Tasks (if available — richer, crop-specific from Gemini) */}
+          {aiTasks && aiTasks.length > 0 ? (
+            aiTasks.map((task, idx) => {
+              const taskId = `ai-task-${task.id || idx}`;
+              const isDone = completedTasks[taskId];
+              const isUrgent = task.urgency === 'Urgent' || task.urgency === 'अतितातडीचे' || task.urgency === 'अति-आवश्यक';
+              return (
+                <div
+                  key={taskId}
+                  onClick={() => toggleTask(taskId)}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                    isDone
+                      ? 'bg-slate-900/40 border-slate-800 text-slate-500 line-through opacity-70'
+                      : isUrgent
+                      ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500/70 shadow-sm shadow-rose-950/40'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/40'
+                  }`}
+                >
+                  <button className="mt-0.5 flex-shrink-0 text-emerald-400">
+                    {isDone ? <CheckSquare className="w-5 h-5 text-emerald-400" /> : <Square className="w-5 h-5 text-slate-400" />}
+                  </button>
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20 flex items-center gap-1">
+                        🤖 {task.title}
+                      </span>
+                      {isUrgent && !isDone && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                          {t.urgentBadge || 'Urgent'}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs font-bold leading-relaxed ${isDone ? 'text-slate-500' : 'text-slate-100'}`}>
+                      {task.subtitle}
+                    </p>
+                    {task.urgency && (
+                      <span className={`text-[10px] font-semibold ${
+                        isUrgent ? 'text-rose-400' : 'text-slate-400'
+                      }`}>
+                        Priority: {task.urgency}
                       </span>
                     )}
                   </div>
-                  <p className={`text-xs font-bold leading-relaxed ${isDone ? 'text-slate-500' : 'text-slate-100'}`}>
-                    {task.text}
-                  </p>
-                  {task.sub && (
-                    <p className={`text-[11px] leading-relaxed ${isDone ? 'text-slate-600' : 'text-slate-300'}`}>
-                      {task.sub}
-                    </p>
-                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            // Fallback: ML-derived local tasks (always computed fresh from activeCropKey & prediction)
+            tasksList.map((task) => {
+              const isDone = completedTasks[task.id];
+              const Icon = task.icon || Sprout;
+              return (
+                <div
+                  key={task.id}
+                  onClick={() => toggleTask(task.id)}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+                    isDone
+                      ? 'bg-slate-900/40 border-slate-800 text-slate-500 line-through opacity-70'
+                      : task.urgent
+                      ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500/70 shadow-sm shadow-rose-950/40'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/40'
+                  }`}
+                >
+                  <button className="mt-0.5 flex-shrink-0 text-emerald-400">
+                    {isDone ? <CheckSquare className="w-5 h-5 text-emerald-400" /> : <Square className="w-5 h-5 text-slate-400" />}
+                  </button>
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                        {task.badge}
+                      </span>
+                      {task.urgent && !isDone && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                          {t.urgentBadge}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs font-bold leading-relaxed ${isDone ? 'text-slate-500' : 'text-slate-100'}`}>
+                      {task.text}
+                    </p>
+                    {task.sub && (
+                      <p className={`text-[11px] leading-relaxed ${isDone ? 'text-slate-600' : 'text-slate-300'}`}>
+                        {task.sub}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Task Completion Progress & Health Bonus Banner */}
