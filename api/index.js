@@ -204,17 +204,19 @@ function computeMLMetrics(crop = "cotton", ndvi = 0.48, ndwi = -0.14, district =
 }
 
 // Fallback Agronomist Tasks by Language
-function getFallbackTasks(crop = "cotton", lang = "en") {
+function getFallbackTasks(crop = "cotton", lang = "en", district = "Jalna", village = "Mantha", state = "Maharashtra") {
   const c = crop.toUpperCase();
+  const locStr = (village && village !== district) ? `${village}, ${district}` : district;
+  
   if (lang === "hi") {
     return [
       {
         id: 1,
         priority: "CRITICAL",
         category: "Irrigation Management",
-        title: "ड्रिप सिंचाई और नमी संरक्षण",
-        subtitle: `${c} की फसल में नमी की कमी देखी गई है। शाम के समय 2.5-3 घंटे हल्की ड्रिप सिंचाई करें।`,
-        action_item: "शाम को ड्रिप सिंचाई चलाएं और क्यारियों में मल्चिंग करें।",
+        title: `ड्रिप सिंचाई और नमी संरक्षण (${locStr})`,
+        subtitle: `${locStr} में ${c} की फसल में नमी की कमी देखी गई है। शाम के समय 2.5-3 घंटे हल्की ड्रिप सिंचाई करें।`,
+        action_item: `${locStr} के खेतों में शाम को ड्रिप सिंचाई चलाएं और मल्चिंग करें।`,
         urgency: "अति-आवश्यक",
         icon: "Droplets",
         badge_color: "rose",
@@ -223,8 +225,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 2,
         priority: "HIGH",
         category: "Nutrient Management",
-        title: "पोषक तत्व और पोटाश का छिड़काव",
-        subtitle: "पत्तियों की चमक और रोग प्रतिरोधक क्षमता बढ़ाने के लिए 13:00:45 (पोटेशियम नाइट्रेट) @ 10g/L का छिड़काव करें।",
+        title: `पोषक तत्व और पोटाश का छिड़काव (${district})`,
+        subtitle: `${district} में पत्तियों की चमक और रोग प्रतिरोधक क्षमता बढ़ाने के लिए 13:00:45 (पोटेशियम नाइट्रेट) @ 10g/L का छिड़काव करें।`,
         action_item: "सुबह 10 बजे से पहले 13:00:45 का पर्णीय छिड़काव करें।",
         urgency: "आवश्यक",
         icon: "Sprout",
@@ -234,8 +236,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 3,
         priority: "MEDIUM",
         category: "Pest & Disease Scouting",
-        title: "कीट निगरानी और फेरोमोन ट्रैप",
-        subtitle: "रस चूसक कीटों (एफिड्स/थ्रिप्स) की निगरानी करें और प्रति एकड़ 5 फेरोमोन ट्रैप लगाएं।",
+        title: `कीट निगरानी और फेरोमोन ट्रैप (${locStr})`,
+        subtitle: `${locStr} में रस चूसक कीटों (एफिड्स/थ्रिप्स) की निगरानी करें और प्रति एकड़ 5 फेरोमोन ट्रैप लगाएं।`,
         action_item: "खेत के 10 यादृच्छिक पौधों की निचली पत्तियों की जांच करें।",
         urgency: "नियमित",
         icon: "ShieldAlert",
@@ -245,8 +247,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 4,
         priority: "MEDIUM",
         category: "Soil Aeration",
-        title: "खरपतवार नियंत्रण एवं निराई-गुड़ाई",
-        subtitle: "जड़ों के आसपास से खरपतवार निकालें और हल्की गुड़ाई करें ताकि मृदा में हवा का प्रवाह बढ़े।",
+        title: `खरपतवार नियंत्रण एवं निराई-गुड़ाई (${district})`,
+        subtitle: `${district} की मृदा में जड़ों के आसपास से खरपतवार निकालें और हल्की गुड़ाई करें ताकि हवा का प्रवाह बढ़े।`,
         action_item: "पौधों के बीच हल्की निराई करें।",
         urgency: "नियमित",
         icon: "Sprout",
@@ -256,8 +258,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 5,
         priority: "LOW",
         category: "Micro-Climate Protection",
-        title: "तापमान सुरक्षा एवं नीम तेल छिड़काव",
-        subtitle: "1500 PPM नीम तेल @ 3ml/L का शाम को छिड़काव कर कीटों के अंडे व बच्चों को रोकें।",
+        title: `तापमान सुरक्षा एवं नीम तेल छिड़काव (${locStr})`,
+        subtitle: `${locStr} में 1500 PPM नीम तेल @ 3ml/L का शाम को छिड़काव कर कीटों के अंडे व बच्चों को रोकें।`,
         action_item: "संध्या समय नीम तेल का स्प्रे करें।",
         urgency: "नियमित",
         icon: "Sun",
@@ -270,9 +272,9 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 1,
         priority: "CRITICAL",
         category: "Irrigation Management",
-        title: "ठिबक सिंचन आणि ओलावा व्यवस्थापन",
-        subtitle: `${c} पिकात पाण्याचा ताण दिसून येत आहे. सायंकाळी २ ते ३ तास ठिबक सिंचनाद्वारे पाणी द्या.`,
-        action_item: "सायंकाळी ठिबक सिंचन सुरू करा व बाष्पीभवन रोखण्यासाठी उपाय करा.",
+        title: `ठिबक सिंचन आणि ओलावा व्यवस्थापन (${locStr})`,
+        subtitle: `${locStr} मधील ${c} पिकात पाण्याचा ताण दिसून येत आहे. सायंकाळी २ ते ३ तास ठिबक सिंचनाद्वारे पाणी द्या.`,
+        action_item: `${locStr} मध्ये सायंकाळी ठिबक सिंचन सुरू करा व ओलावा टिकवण्यासाठी उपाय करा.`,
         urgency: "अतितातडीचे",
         icon: "Droplets",
         badge_color: "rose",
@@ -281,8 +283,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 2,
         priority: "HIGH",
         category: "Nutrient Management",
-        title: "पोटॅशियम नायट्रेट (१३:००:४५) फवारणी",
-        subtitle: "पानांची प्रतिकारशक्ती वाढवण्यासाठी १३:००:४५ @ १० ग्रॅम/लिटर पाण्यात मिसळून फवारा.",
+        title: `पोटॅशियम नायट्रेट (१३:००:४५) फवारणी (${district})`,
+        subtitle: `${district} मधील पिकांची प्रतिकारशक्ती वाढवण्यासाठी १३:००:४५ @ १० ग्रॅम/लिटर पाण्यात मिसळून फवारा.`,
         action_item: "सकाळी १० पूर्वी पोटॅशियम नायट्रेटची फवारणी पूर्ण करा.",
         urgency: "तातडीचे",
         icon: "Sprout",
@@ -292,8 +294,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 3,
         priority: "MEDIUM",
         category: "Pest Scouting",
-        title: "रसशोषक किडींचे निरीक्षण व सापळे",
-        subtitle: "मावा, तुडतुडे व फुलकिडे यांच्यासाठी प्रति एकर ५ कामगंध सापळे व पिवळे चिकट कार्ड लावा.",
+        title: `रसशोषक किडींचे निरीक्षण व सापळे (${locStr})`,
+        subtitle: `${locStr} मध्ये मावा, तुडतुडे व फुलकिडे यांच्यासाठी प्रति एकर ५ कामगंध सापळे व पिवळे चिकट कार्ड लावा.`,
         action_item: "शेतातील ५ ठिकाणी पानांच्या खालच्या बाजूची तपासणी करा.",
         urgency: "नियमित",
         icon: "ShieldAlert",
@@ -303,8 +305,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 4,
         priority: "MEDIUM",
         category: "Soil Health",
-        title: "तण नियंत्रण व कोळपणी",
-        subtitle: "मुळांभोवती तण काढून घ्या व हलकी कोळपणी करा जेणेकरून जमिनीत ऑक्सिजन सुधारेल.",
+        title: `तण नियंत्रण व कोळपणी (${district})`,
+        subtitle: `${district} मधील मुळांभोवती तण काढून घ्या व हलकी कोळपणी करा जेणेकरून जमिनीत ऑक्सिजन सुधारेल.`,
         action_item: "ओळींमध्ये हलकी कोळपणी करा.",
         urgency: "नियमित",
         icon: "Sprout",
@@ -314,8 +316,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 5,
         priority: "LOW",
         category: "Micro-Climate Protection",
-        title: "उष्णता ताण संरक्षण व निंबोळी अर्क",
-        subtitle: "१५०० पीपीएम निंबोळी अर्क ३ मिली/लिटर फवारून किडींच्या अंडींचे नियंत्रण करा.",
+        title: `उष्णता ताण संरक्षण व निंबोळी अर्क (${locStr})`,
+        subtitle: `${locStr} मध्ये १५०० पीपीएम निंबोळी अर्क ३ मिली/लिटर फवारून किडींच्या अंडींचे नियंत्रण करा.`,
         action_item: "संध्याकाळी निंबोळी अर्क फवारा.",
         urgency: "नियमित",
         icon: "Sun",
@@ -328,8 +330,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 1,
         priority: "CRITICAL",
         category: "Irrigation Management",
-        title: "ಹನಿ ನೀರಾವರಿ ಮತ್ತು ತೇವಾಂಶ ರಕ್ಷಣೆ",
-        subtitle: `${c} ಬೆಳೆಗೆ 2.5-3 ಗಂಟೆಗಳ ಕಾಲ ಸಂಜೆ ಹನಿ ನೀರಾವರಿ ನೀಡಿ.`,
+        title: `ಹನಿ ನೀರಾವರಿ ಮತ್ತು ತೇವಾಂಶ ರಕ್ಷಣೆ (${locStr})`,
+        subtitle: `${locStr} ನಲ್ಲಿ ${c} ಬೆಳೆಗೆ 2.5-3 ಗಂಟೆಗಳ ಕಾಲ ಸಂಜೆ ಹನಿ ನೀರಾವರಿ ನೀಡಿ.`,
         action_item: "ಸಂಜೆ ಹನಿ ನೀರಾವರಿ ನಡೆಸಿ.",
         urgency: "ಅತಿ-ಅಗತ್ಯ",
         icon: "Droplets",
@@ -339,8 +341,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 2,
         priority: "HIGH",
         category: "Nutrient Management",
-        title: "ಪೊಟ್ಯಾಸಿಯಮ್ ನೈಟ್ರೇಟ್ ಸಿಂಪಡಣೆ",
-        subtitle: "13:0:45 @ 10g/L ಸಿಂಪಡಿಸಿ ಹೂವು ಉದುರುವುದನ್ನು ತಡೆಯಿರಿ.",
+        title: `ಪೊಟ್ಯಾಸಿಯಮ್ ನೈಟ್ರೇಟ್ ಸಿಂಪಡಣೆ (${district})`,
+        subtitle: `${district} ನಲ್ಲಿ 13:0:45 @ 10g/L ಸಿಂಪಡಿಸಿ ಹೂವು ಉದುರುವುದನ್ನು ತಡೆಯಿರಿ.`,
         action_item: "ಬೆಳಿಗ್ಗೆ ಸಿಂಪಡಣೆ ಮಾಡಿ.",
         urgency: "ಅಗತ್ಯ",
         icon: "Sprout",
@@ -350,8 +352,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 3,
         priority: "MEDIUM",
         category: "Pest Scouting",
-        title: "ಕೀಟಗಳ ಪರಿಶೀಲನೆ ಮತ್ತು ಮೋಹಕ ಬಲೆ",
-        subtitle: "ಎಕರೆಗೆ 5 ಮೋಹಕ ಬಲೆಗಳನ್ನು ಅಳವಡಿಸಿ.",
+        title: `ಕೀಟಗಳ ಪರಿಶೀಲನೆ ಮತ್ತು ಮೋಹಕ ಬಲೆ (${locStr})`,
+        subtitle: `${locStr} ನಲ್ಲಿ ಎಕರೆಗೆ 5 ಮೋಹಕ ಬಲೆಗಳನ್ನು ಅಳವಡಿಸಿ.`,
         action_item: "ಎಲೆಗಳ ಕೆಳಭಾಗವನ್ನು ತಪಾಸಣೆ ಮಾಡಿ.",
         urgency: "ಸಾಮಾನ್ಯ",
         icon: "ShieldAlert",
@@ -361,8 +363,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 4,
         priority: "MEDIUM",
         category: "Soil Health",
-        title: "ಕಳೆ ನಿರ್ವಹಣೆ ಮತ್ತು ಮಣ್ಣಿನ ಆರೈಕೆ",
-        subtitle: "ಸಾಲುಗಳ ನಡುವೆ ಕಳೆಗಳನ್ನು ತೆಗೆದು ಮಣ್ಣನ್ನು ಹಗುರಗೊಳಿಸಿ.",
+        title: `ಕಳೆ ನಿರ್ವಹಣೆ ಮತ್ತು ಮಣ್ಣಿನ ಆರೈಕೆ (${district})`,
+        subtitle: `${district} ನಲ್ಲಿ ಸಾಲುಗಳ ನಡುವೆ ಕಳೆಗಳನ್ನು ತೆಗೆದು ಮಣ್ಣನ್ನು ಹಗುರಗೊಳಿಸಿ.`,
         action_item: "ಕಳೆ ತೆಗೆಯಿರಿ.",
         urgency: "ಸಾಮಾನ್ಯ",
         icon: "Sprout",
@@ -372,8 +374,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 5,
         priority: "LOW",
         category: "Micro-Climate Shield",
-        title: "ಜೈವಿಕ नीम ಎಣ್ಣೆ ಸಿಂಪಡಣೆ",
-        subtitle: "1500 PPM नीम ಎಣ್ಣೆಯನ್ನು 3ml/L ಸಿಂಪಡಿಸಿ.",
+        title: `ಜೈವಿಕ नीम ಎಣ್ಣೆ ಸಿಂಪಡಣೆ (${locStr})`,
+        subtitle: `${locStr} ನಲ್ಲಿ 1500 PPM नीम ಎಣ್ಣೆಯನ್ನು 3ml/L ಸಿಂಪಡಿಸಿ.`,
         action_item: "ಸಂಜೆ ಸಿಂಪಡಿಸಿ.",
         urgency: "ಸಾಮಾನ್ಯ",
         icon: "Sun",
@@ -386,8 +388,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 1,
         priority: "CRITICAL",
         category: "Irrigation Management",
-        title: "డ్రిప్ నీటి యాజమాన్యం",
-        subtitle: `${c} పంటకు సాయంత్రం 2.5-3 గంటలు డ్రిప్ ద్వారా నీరందించండి.`,
+        title: `డ్రిప్ నీటి యాజమాన్యం (${locStr})`,
+        subtitle: `${locStr} లో ${c} పంటకు సాయంత్రం 2.5-3 గంటలు డ్రిప్ ద్వారా నీరందించండి.`,
         action_item: "సాయంత్రం డ్రిప్ నీరందించండి.",
         urgency: "అత్యవసరం",
         icon: "Droplets",
@@ -397,8 +399,8 @@ function getFallbackTasks(crop = "cotton", lang = "en") {
         id: 2,
         priority: "HIGH",
         category: "Nutrient Management",
-        title: "పొటాషియం నైట్రేట్ (13:0:45) స్ప్రే",
-        subtitle: "లీటరు నీటికి 10 గ్రాములు కలిపి స్ప్రే చేయండి.",
+        title: `పొటాషియం నైట్రేట్ (13:0:45) స్ప్రే (${district})`,
+        subtitle: `${district} లో లీటరు నీటికి 10 గ్రాములు కలిపి స్ప్రే చేయండి.`,
         action_item: "ఉదయాన్నే స్ప్రే చేయండి.",
         urgency: "అవసరం",
         icon: "Sprout",
@@ -667,7 +669,11 @@ export default async function handler(req, res) {
       if (subPath === "/ai-advisory") {
         const crop = url.searchParams.get("crop_type") || "cotton";
         const lang = url.searchParams.get("lang") || "en";
-        const tasks = getFallbackTasks(crop, lang);
+        const aoi = customAois.find((a) => a.id === aoiId) || {};
+        const district = aoi.district || "Jalna";
+        const village = aoi.village || aoi.taluk || district;
+        const state = aoi.state || "Maharashtra";
+        const tasks = getFallbackTasks(crop, lang, district, village, state);
 
         return res.status(200).json({
           aoi_id: aoiId,
@@ -712,7 +718,10 @@ export default async function handler(req, res) {
       const body = await parseJsonBody(req);
       const crop = body.crop_type || "cotton";
       const lang = url.searchParams.get("lang") || "en";
-      const tasks = getFallbackTasks(crop, lang);
+      const district = body.district || "Jalna";
+      const village = body.village || district;
+      const state = body.state || "Maharashtra";
+      const tasks = getFallbackTasks(crop, lang, district, village, state);
 
       return res.status(200).json({
         crop_type: crop,

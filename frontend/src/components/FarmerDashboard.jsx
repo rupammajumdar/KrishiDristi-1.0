@@ -530,10 +530,11 @@ export default function FarmerDashboard({
         newNdvi = satData.ndvi;
         newNdwi = satData.ndwi;
       } else {
-        // Multi-temporal Sentinel-2 optical pass simulation (NDVI varies across 0.35-0.72)
-        const randJitter = (Math.random() * 0.16 - 0.08);
+        // Multi-temporal Sentinel-2 optical pass simulation (deterministic for same coordinates & crop)
+        const seed = Math.abs(Math.sin(lat * 12.9898 + lon * 78.233 + activeCropKey.length * 4.13) * 43758.5453);
+        const fixedVariation = Number(((seed - Math.floor(seed)) * 0.04 - 0.02).toFixed(2));
         const currentNdvi = activePrediction?.input_snapshot_json?.mean_ndvi ?? 0.48;
-        newNdvi = Number(Math.max(0.32, Math.min(0.78, currentNdvi + randJitter + 0.04)).toFixed(2));
+        newNdvi = Number(Math.max(0.32, Math.min(0.78, currentNdvi + fixedVariation)).toFixed(2));
         newNdwi = Number((newNdvi * 0.45 - 0.34).toFixed(2));
       }
 
