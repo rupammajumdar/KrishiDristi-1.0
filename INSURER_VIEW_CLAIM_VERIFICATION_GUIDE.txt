@@ -1,0 +1,154 @@
+================================================================================
+KRISHIDRISHTI AI — INSURER VIEW & CLAIM VERIFICATION (विमा पडताळणी) GUIDE
+================================================================================
+File: INSURER_VIEW_CLAIM_VERIFICATION_GUIDE.txt
+Language: Easy Hinglish + Technical English
+Purpose: Complete Guide to the PMFBY Crop Insurance Claim Verification & Loss Assessment Portal
+Target Users: Insurance Adjusters, Actuaries, Risk Underwriters, PMFBY Surveyors
+Platform: KrishiDristi AI Precision Agriculture, Insurance Compliance & Anti-Fraud Engine
+================================================================================
+
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS:
+--------------------------------------------------------------------------------
+1. OVERVIEW: INSURER CLAIM VIEW KYA HAI AUR KISKE LIYE HAI?
+2. THE PMFBY PROBLEM: TRADITIONAL INSURANCE FLAWS VS KRISHIDRISHTI
+3. DETAILED BREAKDOWN OF EVERY OPTION, CARD & FEATURE
+   - 3.1 Claim Verification Header & One-Click Insurer Audit Report PDF
+   - 3.2 Top 3 Model Provenance & Loss Estimation Metric Cards
+   - 3.3 Raw Input Feature Snapshot Viewer (Immutable JSON Telemetry)
+   - 3.4 Satellite Multi-Pass Historical Time-Series Audit Trail Table
+4. ANTI-FRAUD ENGINE: GHOST CLAIMS & FALSE DAMAGE DETECTION
+5. HOW AN INSURANCE ADJUSTER VERIFIES A CLAIM (STEP-BY-STEP WORKFLOW)
+================================================================================
+
+
+================================================================================
+1. OVERVIEW: INSURER CLAIM VIEW KYA HAI AUR KISKE LIYE HAI?
+================================================================================
+
+Insurer View (विमा कंपनी पडताळणी पोर्टल) KrishiDristi AI ka ek objective, satellite-grounded insurance claim audit platform hai.
+Yeh PMFBY (Pradhan Mantri Fasal Bima Yojana) implement karne wali insurance companies (e.g. Agriculture Insurance Company of India - AIC, HDFC ERGO, ICICI Lombard, SBI General) aur claim assessment officers ke liye design kiya gaya hai.
+
+Jab koi kisan fasal kharab hone ka bima claim (crop insurance claim) daalta hai, to insurance company ko yeh verify karna hota hai ki:
+1. Kya sach me us khet me fasal boyi gayi thi?
+2. Kya sach me sukha (drought), flood ya pest attack se fasal ka nuksan hua hai?
+3. Nuksan kitne percent hua hai aur actual payout kitna banta hai?
+
+Insurer View third-party objective satellite evidence aur immutable ML audit trail provide karta hai, jisse claim settlement ka time 6 mahine se ghatkar sirf 48 ghante ho jaata hai.
+
+
+================================================================================
+2. THE PMFBY PROBLEM: TRADITIONAL INSURANCE FLAWS VS KRISHIDRISHTI
+================================================================================
+
+[TRADITIONAL CROP INSURANCE PAIN POINTS]:
+1. Manual Crop Cutting Experiments (CCEs): Traditional system me manual CCEs karne me mahino lagte hain aur sample size bohot chhota (1% se kam) hota hai.
+2. Huge Claim Delays (6 to 12 Months): Kisan ko jab agle season ke beej/khad ke liye paise chahiye hote hain, tab tak claim ka paisa milta hi nahi.
+3. Ghost & Fraudulent Claims: Kuch log bina kheti kiye ya doosre khet ki purani photo upload karke fake claim le lete hain, jisse insurance companies ko karodon ka ghata hota hai.
+4. Farmer Dissatisfaction: Asli zarooratmand kisan ko claim reject hone ka dar rehta hai.
+
+[KRISHIDRISHTI INSURER VIEW SOLUTION]:
+1. 100% Polygon-Level Satellite Audit: Har khet ke specific GeoJSON polygon par Sentinel-2 multi-spectral scan.
+2. Historical Sowing Verification: Sowing date se lekar harvesting date tak 5-day interval ka NDVI curve prove karta hai ki fasal kheti me thi ya banjar zameen thi.
+3. Mathematical Loss Estimation: ML Regressor aur 5-year district baseline se exact loss percentage calculate hota hai.
+4. Tamper-Proof Audit Trail: Har satellite scene ka exact acquisition timestamp aur pass ID record hota hai.
+
+
+================================================================================
+3. DETAILED BREAKDOWN OF EVERY OPTION, CARD & FEATURE
+================================================================================
+
+Jab aap top bar me 'Insurer' tab par click karte hain, to screen par yeh options milte hain:
+
+--------------------------------------------------------------------------------
+3.1 CLAIM VERIFICATION HEADER & ONE-CLICK AUDIT REPORT PDF
+--------------------------------------------------------------------------------
+- [HEADER TITLE]: "PMFBY Claim Verification & Loss Assessment".
+- [SUBTITLE]: "Objective 3rd-Party Satellite Evidence & Immutable ML Prediction Audit Trail".
+- [DOWNLOAD INSURER AUDIT REPORT BUTTON] (📄 Download Insurer Audit Report):
+  * Official Legal Claim Audit Certificate generate karta hai.
+  * PDF me farm coordinates, crop type, baseline yield, predicted harvest loss percentage, satellite pass history aur verified weather data documented hota hai.
+  * Yeh document PMFBY claim approval ya rejection ke liye legal evidence ka kaam karta hai.
+
+--------------------------------------------------------------------------------
+3.2 TOP 3 MODEL PROVENANCE & LOSS ESTIMATION METRIC CARDS
+--------------------------------------------------------------------------------
+Yeh 3 cards insurance underwriter ko transparent ML parameters aur loss assessment dikhate hain:
+
+1. [ACTIVE ML MODEL VERSION CARD] (सक्रिय ML मॉडेल):
+   - Version ID: (e.g. `v1.2.0-rf-cotton`).
+   - Subtext: "Validation MAPE: 11.4% (R² = 0.89)" — Yeh prove karta hai ki ML model 89% accuracy ke saath historical ground-truth data par validated hai aur error rate sirf 11% hai.
+
+2. [PREDICTED LOSS VS BASELINE CARD] (नुकसान टक्केवारी / Yield Loss %):
+   - Big Metric: (e.g. `-21.8% Loss` in Rose Red color).
+   - Subtext: "Baseline: 2,200 kg/ha | Forecast: 1,720 kg/ha" — Clear comparison ki 5-saal ka normal average kitna tha aur is baar satellite telemetry ke mutabik kitna harvest hoga.
+
+3. [EARLY WARNING HISTORY CARD] (पूर्वसूचना पडताळणी / EWS Status):
+   - Status: "Verified (Drought Risk)" in Green.
+   - Subtext: "First Alert Date: 2026-08-10" — Yeh confirm karta hai ki system ne kisan ko pehle hi moisture drop ka alert diya tha ya achanak loss hua hai.
+
+--------------------------------------------------------------------------------
+3.3 RAW INPUT FEATURE SNAPSHOT VIEWER (IMMUTABLE JSON TELEMETRY)
+--------------------------------------------------------------------------------
+- [RAW FEATURE SNAPSHOT BAR] (डेटा स्नॅपशॉट):
+  * [View Full Raw JSON / Hide JSON Toggle Button]: Click karne par raw telemetry inspector khulta hai.
+- [JSON CONTENT INSPECTOR]:
+  * Display karta hai ki inference nikalne ke liye koun se exact values use huye the:
+    ```json
+    {
+      "mean_ndvi": 0.44,
+      "mean_ndwi": -0.15,
+      "rainfall_mm": 360.0,
+      "temp_avg_c": 29.5,
+      "crop_type": "cotton",
+      "timestamp": "2026-08-28T19:24:00Z"
+    }
+    ```
+  * Isse insurance company aur government audit team dono ko 100% transparency milti hai.
+
+--------------------------------------------------------------------------------
+3.4 SATELLITE MULTI-PASS HISTORICAL TIME-SERIES AUDIT TABLE
+--------------------------------------------------------------------------------
+- [HISTORICAL TIME-SERIES AUDIT TABLE] (उपग्रह डेटा इतिहास):
+  * Table khet ke pichle 4 consecutive satellite passes ka chronological record dikhata hai:
+    - Acquisition Date: e.g. 2026-07-26, 2026-07-31, 2026-08-05, 2026-08-10.
+    - Scene Pass ID: Sentinel-2 official ESA scene identifier (e.g. `S2A_MSIL2A_20260810`).
+    - Observed NDVI: Har pass par khet ka actual vegetation vigor (0.60 ➔ 0.52 ➔ 0.48 ➔ 0.44).
+    - Yield Forecast: Har date par expected production in kg/ha.
+    - Model Version: Uss time chala model version.
+    - EWS Alert Triggered: Badge showing "Yes (Drought Risk)" ya "No".
+  * Is table se adjuster ko saaf dikh jaata hai ki fasal dheere-dheere sukhe ki wajah se gir rahi thi, koi artificial manipulation nahi hai.
+
+
+================================================================================
+4. ANTI-FRAUD ENGINE: GHOST CLAIMS & FALSE DAMAGE DETECTION
+================================================================================
+
+Insurer View 3 sabse bade insurance scams ko instantly detect kar leta hai:
+
+1. Ghost Sowing Fraud (फसवणूक - पेरणी नसताना क्लेम):
+   - Agar kisan ne claim daala ki meri fasal barbad ho gayi, lekin sowing season me NDVI < 0.20 (Barren Land/Soil) raha ho, to system turant "No Active Crop Detected" flag kar deta hai. Fake claim pakda jaata hai!
+
+2. Post-Harvest Fake Claim (कापणीनंतर खोटा क्लेम):
+   - Agar kisan ne fasal kaat kar bech di aur fir claim daal diya, to historical NDVI curve me normal maturity peak aur sudden harvesting drop dikhta hai, na ki gradual moisture drought decay.
+
+3. Area Exaggeration Fraud (क्षेत्रफळ वाढवून सांगणे):
+   - Kisan ke 7/12 document par 5 acre likha hai par claim 10 acre par daala hai, to map par draw kiya gaya actual polygon area turant mismatch flag karta hai.
+
+
+================================================================================
+5. HOW AN INSURANCE ADJUSTER VERIFIES A CLAIM (STEP-BY-STEP WORKFLOW)
+================================================================================
+
+1. Step 1: Adjuster PMFBY Claim ID ya Plot ID select karta hai.
+2. Step 2: Map par khet ki exact boundary aur current NDVI layer check karta hai.
+3. Step 3: 'Predicted Loss vs Baseline' card me check karta hai ki loss policy threshold (e.g. >20% loss) cross kar raha hai ya nahi.
+4. Step 4: Historical Time-Series table me pichle 4 satellite passes ka NDVI trend verify karta hai ki damage genuine drought/weather se hua hai.
+5. Step 5: [View Raw JSON] se raw telemetry verify karta hai.
+6. Step 6: [Download Insurer Audit Report] par click karke legal audit PDF download karta hai aur claim ko 48 hours ke andar Instant Approve/Reject kar deta hai.
+
+================================================================================
+END OF INSURER VIEW & CLAIM VERIFICATION GUIDE
+================================================================================

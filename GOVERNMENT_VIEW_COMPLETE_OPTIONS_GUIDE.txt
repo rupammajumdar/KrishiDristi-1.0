@@ -1,0 +1,156 @@
+================================================================================
+KRISHIDRISHTI AI — GOVERNMENT VIEW (शासकीय डॅशबोर्ड) COMPLETE GUIDE
+================================================================================
+File: GOVERNMENT_VIEW_COMPLETE_OPTIONS_GUIDE.txt
+Language: Easy Hinglish + Technical English
+Purpose: Complete Guide to the Government Macro Dashboard, Drought Tracking & Policy Tools
+Target Users: District Magistrates (DM), Agriculture Officers (DAO), Relief Commissioners
+Platform: KrishiDristi AI Precision Agriculture, Disaster Management & Food Security
+================================================================================
+
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS:
+--------------------------------------------------------------------------------
+1. OVERVIEW: GOVERNMENT VIEW KYA HAI AUR KISKE LIYE HAI?
+2. CORE OBJECTIVE & PROBLEM STATEMENT (SOLVED BY GOVT VIEW)
+3. DETAILED BREAKDOWN OF EVERY OPTION, CARD & FEATURE
+   - 3.1 Macro Jurisdiction & District Quick Selector
+   - 3.2 Government Evidence Export & Audit PDF Generator
+   - 3.3 Top 4 Macro KPI Metric Cards (Plots, Stress, Water Depletion, Drought Alerts)
+   - 3.4 3-Click Drill-Down Table (District -> Taluka -> Village -> Plot)
+4. PRACTICAL GOVERNMENT USE CASES (DISASTER RELIEF, SUBSIDY & FERTILIZERS)
+5. HOW AN AGRICULTURE OFFICER OR DISTRICT COLLECTOR USES THIS VIEW (STEP-BY-STEP)
+================================================================================
+
+
+================================================================================
+1. OVERVIEW: GOVERNMENT VIEW KYA HAI AUR KISKE LIYE HAI?
+================================================================================
+
+Government View (शासकीय डॅशबोर्ड) KrishiDristi AI ka ek macro-level analytics portal hai.
+Yeh District Magistrates (DM), District Agricultural Officers (DAO), Taluka Krishi Adhikari aur Disaster Management Departments ke liye banaya gaya hai.
+
+Jab hazaron-lakhon kisan kisi district me fasal ugate hain, to Sarkar ke paas har ek khet me physical survey karne ka time ya manpower nahi hota. 
+Government View poore district aur taluka ka automated satellite aggregation karta hai aur ek single screen par dikha deta hai ki:
+- District ke kaun se taluka me sukha (drought) pad raha hai.
+- Kitne percent khet red zone (severe crop stress) me hain.
+- District ke jheelon, talabon (water reservoirs) me kitna paani bacha hai.
+- Kahan turant subsidized khaad, beej ya paani ke tankers bhejne ki zaroorat hai.
+
+
+================================================================================
+2. CORE OBJECTIVE & PROBLEM STATEMENT (SOLVED BY GOVT VIEW)
+================================================================================
+
+[TRADITIONAL GOVERNMENT CHALLENGES]:
+1. Manual Patwari / Girdawari Surveys: Khet-khet jaakar report banane me 3 se 6 mahine lag jaate hain, tab tak fasal barbad ho chuki hoti hai.
+2. Subjective & Biased Reports: Paper reports me corruption ya galti ki sambhavna hoti hai.
+3. Lack of Real-Time Drought Warning: Jab tak kisan aawaz uthate hain, tab tak ground water aur dam sukh chuke hote hain.
+
+[KRISHIDRISHTI GOVERNMENT VIEW SOLUTION]:
+1. 100% Automated Satellite Coverage: Sentinel-2 satellite har 5 din me poore district ka scan karke live roll-up banati hai.
+2. Objective Color-Coded Triage: Har khet automatically Green (Healthy), Yellow (Moderate), ya Red (Severe) me categorized hota hai.
+3. 3-Click Drill-Down: Collector 1 click me District -> Taluka -> Village -> Individual Plot tak drill down kar sakta hai.
+4. One-Click Official Evidence Export: Central relief packages ke liye official satellite audit report generate hoti hai.
+
+
+================================================================================
+3. DETAILED BREAKDOWN OF EVERY OPTION, CARD & FEATURE
+================================================================================
+
+Jab aap top bar me 'Government' tab par click karte hain, to screen par yeh options aate hain:
+
+--------------------------------------------------------------------------------
+3.1 MACRO JURISDICTION & DISTRICT QUICK SELECTOR (जिल्हा व राज्य निवडा)
+--------------------------------------------------------------------------------
+- Location: Dashboard ke sabse top par.
+- Options:
+  1. Current Jurisdiction Badge: Currently active district aur state dikhata hai (e.g. "📍 Jalna, Maharashtra" ya "📍 Raipur, Chhattisgarh").
+  2. Quick District Switcher Chips: Populated districts par 1-click me switch karne ke buttons:
+     * 🌾 Raipur (Chhattisgarh)
+     * 🌱 Jalna (Maharashtra)
+     * 🍇 Pune (Maharashtra)
+     * 🍊 Nagpur (Maharashtra)
+     * 🌿 Bengaluru (Karnataka)
+     * 🌾 Hyderabad (Telangana)
+     * 🌾 Ludhiana (Punjab)
+     * 🌻 Jaipur (Rajasthan)
+     * 🌱 Bhopal (Madhya Pradesh)
+- Action: Kisi bhi district button par click karte hi backend turant us poore district ka aggregated data, taluka breakup aur water depletion calculate karke screen refresh kar deta hai.
+
+--------------------------------------------------------------------------------
+3.2 GOVERNMENT EVIDENCE EXPORT & AUDIT PDF GENERATOR
+--------------------------------------------------------------------------------
+- [EXPORT EVIDENCE / DOWNLOAD REPORT BUTTON] (📥 Export Official Evidence PDF):
+  * Official Government Audit PDF generate karta hai.
+  * Report me State/District level summary, taluka-wise NDVI graphs, reservoir depletion percentage aur recommended relief fund allocation tables shamil hote hain.
+  * Yeh report State Disaster Management Authority (SDMA) ya Ministry of Agriculture ko relief package sanction karne ke liye legal evidence ke roop me bhej sakte hain.
+
+--------------------------------------------------------------------------------
+3.3 TOP 4 MACRO KPI METRIC CARDS
+--------------------------------------------------------------------------------
+Yeh 4 cards district ki overall agricultural health ka 5-second snapshot dete hain:
+
+1. [TOTAL MONITORED PLOTS CARD] (एकूण शेत प्लॉट्स):
+   - Number: (e.g. `1,240 Plots` registered).
+   - Subtext: "100% Satellite Coverage" — confirmation deta hai ki poore district ke har registered plot par Sentinel-2 telemetry chal rahi hai.
+
+2. [SEVERE STRESS PLOTS (RED) CARD] (गंभीर ताण / धोक्यात असलेली शेती):
+   - Number: (e.g. `250 Plots` in Red Zone).
+   - Subtext: "20.2% of District" — percentage batata hai ki district ka kitna hissa critical moisture collapse ya crop failure ki kagaar par hai.
+
+3. [RESERVOIR WATER SURFACE DEPLETION CARD] (पाणी साठा घट / Lakes Depletion):
+   - Number: (e.g. `-21.4% Water Depletion`).
+   - Subtext: "vs 5-Year Baseline (14 Lakes/Reservoirs)" — PyTorch U-Net aur NDWI water boundary detection se district ke sabhi 14 pramukh talabon ka surface area compare karta hai. Agar paani 20%+ gir gaya hai, to yeh early drought signal hai.
+
+4. [ACTIVE DROUGHT ALERTS CARD] (सक्रिय दुष्काळ इशारे):
+   - Number: (e.g. `18 Active Alerts`).
+   - Subtext: "Requires Relief Assessment" — Taluka-level agriculture officers ko inspection ke liye flag karta hai.
+
+--------------------------------------------------------------------------------
+3.4 3-CLICK DRILL-DOWN TABLE (DISTRICT -> TALUKA -> VILLAGE)
+--------------------------------------------------------------------------------
+- Purpose: Macro level se micro level tak detail dekhne ke liye.
+- Columns:
+  1. Taluka Name (e.g. "Jalna Central", "Jalna North", "Badnapur", "Ambad", "Partur").
+  2. Total Plots: Us taluka me monitored total plots.
+  3. Green (High Vigor): Healthy khet jahan fasal mast chal rahi hai.
+  4. Yellow (Moderate Stress): Khet jahan halka paani ka tanav hai (early warning).
+  5. Red (Severe Stress): Critical failure plots jahan turant relief zaroori hai.
+  6. Avg NDVI: Taluka ka mean vegetation index (e.g. `0.54` healthy vs `0.42` stressed).
+  7. Lakes Monitored: Us taluka me kitne water reservoirs monitor ho rahe hain.
+  8. Interactive Row Expansion (Chevron Arrow `>`): Row par click karne par taluka select hota hai aur uske villages ka micro-breakdown khulta hai.
+
+
+================================================================================
+4. PRACTICAL GOVERNMENT USE CASES (DISASTER RELIEF, SUBSIDY & FERTILIZERS)
+================================================================================
+
+1. Drought Declaration (दुष्काळ जाहीर करणे):
+   - Pehle drought declare karne me mahino lagte the. KrishiDristi satellite data se Collector 48 ghante me scientific proof ke saath drought declare kar sakta hai.
+
+2. Targeted Water Tanker Allocation:
+   - Jin talukas me "Water Body Depletion" 30%+ dikh rahi hai, wahan drinking water tankers aur irrigation canal releases ko prioritize kiya jaata hai.
+
+3. Fertilizer & Seed Quota Planning:
+   - Agar kisi taluka me NDVI aur soil moisture optimal hai, to wahan high-yield fertilizer quota release hota hai; jahan severe stress hai wahan drought-resistant seeds provide kiye jaate hain.
+
+4. Prevention of Relief Fund Leakage:
+   - Relief fund sirf unhi blocks aur kisaano ko milta hai jinki satellite report me actually Red/Severe Stress verified hai. Fraud aur fake claims eliminate ho jaate hain.
+
+
+================================================================================
+5. HOW AN AGRICULTURE OFFICER OR COLLECTOR USES THIS VIEW (STEP-BY-STEP)
+================================================================================
+
+1. Step 1: Officer login karke 'Government' persona select karta hai.
+2. Step 2: District dropdown ya chips se apna district (e.g. "Jalna") select karta hai.
+3. Step 3: Top 4 KPI cards me Red Plots (Severe Stress) aur Water Depletion % check karta hai.
+4. Step 4: Drill-Down table me dekhta hai ki kis taluka me Red count sabse zyada hai (e.g. Jalna North).
+5. Step 5: Table row par click karke affected blocks ko identify karta hai.
+6. Step 6: [Export Evidence] button daba kar official PDF download karta hai aur State Relief Committee ko forward karta hai.
+
+================================================================================
+END OF GOVERNMENT VIEW COMPLETE GUIDE
+================================================================================

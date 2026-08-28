@@ -21,6 +21,8 @@ backend/krishidristi.db
 *.json
 !frontend/package.json
 !frontend/tsconfig.json
+!frontend/vercel.json
+!vercel.json
 backend/gee-key.json
 
 # Generated Artifacts

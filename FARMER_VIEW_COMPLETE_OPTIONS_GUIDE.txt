@@ -1,0 +1,308 @@
+================================================================================
+KRISHIDRISHTI AI — FARMER VIEW (शेतकरी दृश्य) COMPLETE OPTIONS & FEATURES GUIDE
+================================================================================
+File: FARMER_VIEW_COMPLETE_OPTIONS_GUIDE.txt
+Language: Easy Hinglish + Clear English
+Purpose: Complete Guide to Every Button, Card, Tab, Modal, Slider & Option on Farmer View
+Platform: KrishiDristi AI Precision Agriculture & Insurance Decision System
+================================================================================
+
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS:
+--------------------------------------------------------------------------------
+1. OVERVIEW: FARMER VIEW KYA HAI AUR KISKE LIYE HAI?
+2. SECTION A: TOP UNIVERSAL NAVIGATION BAR (HEADER OPTIONS)
+3. SECTION B: LEFT PANEL — GIS MAP & SATELLITE TIME-MACHINE CONTROLS
+4. SECTION C: RIGHT PANEL — FARMER DASHBOARD DEEP-DIVE (ALL CARDS & OPTIONS)
+   - C1. Regional Language Selector (भाषा निवडा)
+   - C2. Main Farm Header, Crop Switcher & Plot Manager
+   - C3. Voice Readout & Audio Advisory System (आवाज सल्ला)
+   - C4. Multilingual Audit PDF Report Generator
+   - C5. ML Inference Engine Scorecard (Live ML Models Bar)
+   - C6. Dynamic Crop Health Status Card & 0-100 Score Gauge
+   - C7. "What You Need To Do This Week" — ML Driven Weekly Action Checklist
+   - C8. AI Agronomist Interactive Chatbot (कृषी सहाय्यक Q&A)
+   - C9. Yield Estimation, MSP Market Value & Live Weather Telemetry Cards
+   - C10. NDVI Multi-Temporal Vegetation Health Area Chart
+   - C11. Explainable AI (XAI) "Why This Alert?" Panel (SHAP & Checkpoints)
+   - C12. WhatsApp Share & Kisan Call Center Direct Dial (1800-180-1551)
+5. HOW EVERYTHING CONNECTS: A FARMER'S STEP-BY-STEP USER JOURNEY
+================================================================================
+
+
+================================================================================
+1. OVERVIEW: FARMER VIEW KYA HAI AUR KISKE LIYE HAI?
+================================================================================
+
+Farmer View (शेतकरी डॅशबोर्ड) KrishiDristi AI ka sabse primary, user-friendly aur action-oriented interface hai.
+Isko is tarah design kiya gaya hai ki chahe koi chhota kisan ho jise English na aati ho ya sophisticated agronomist ho, dono bina kisi confusion ke apne khet ki real-time satellite health, moisture stress, disease risk, aur weekly actions samajh sakein.
+
+Screen 2 main parts me divided hoti hai:
+- LEFT 60% SCREEN: Interactive Sentinel-2 Satellite GIS Map + Time-Machine Slider.
+- RIGHT 40% SCREEN: Farmer Dashboard (Health Score, Weekly ML Tasks, AI Agronomist Chat, Yield & MSP Earnings, Audio Advisory).
+
+
+================================================================================
+2. SECTION A: TOP UNIVERSAL NAVIGATION BAR (HEADER OPTIONS)
+================================================================================
+
+Jab aap screen ke top par dekhte hain, to yeh options milte hain:
+
+1. [LOGO & BRANDING] "KrishiDristi AI (कृषिदृष्टि)":
+   - Platform ka main branding logo aur title. Click karne par default home state reset ho jaati hai.
+
+2. [PERSONA SWITCHER TABS]:
+   - 'Farmer' (शेतकरी) [ACTIVE TAB]: Kisanon ke liye tailored view (Health, Advice, Yield, Voice).
+   - 'Government' (शासकीय): DDO / District Collector / Agri-Department ke liye district-level drought/yield rollups.
+   - 'Insurer' (विमा कंपनी): PMFBY claim verification, loss assessment aur risk scoring portal.
+   - 'Admin' (#admin): Backend GEE pipelines, ML model checkpoints aur system cache reload console.
+
+3. [LANGUAGE SELECTOR DROPDOWN]:
+   - Top header me global language switch karne ka option (Marathi, Hindi, English, Kannada, Telugu).
+   - Isse poora UI, buttons, alerts aur advisory instantly translate ho jaate hain.
+
+4. [LIVE GEE / BACKEND SYNC BADGE]:
+   - "Live GEE Active" (Green Glowing Indicator): Yeh confirm karta hai ki frontend live Google Earth Engine aur real FastAPI backend se connected hai.
+   - "Mock Fallback" (Yellow): Agar internet off ho to local realistic dataset se dashboard render hota hai.
+
+5. [NOTIFICATION BELL ICON & UNREAD BADGE]:
+   - Bell icon par click karne par right-side slide-over drawer open hota hai.
+   - Khet me hone wale sudden moisture drops, heatwave alerts aur pest warnings real-time notification ke roop me aate hain.
+
+
+================================================================================
+3. SECTION B: LEFT PANEL — GIS MAP & SATELLITE TIME-MACHINE CONTROLS
+================================================================================
+
+Yeh section khet ke exact geographical location aur satellite spectral data ko interactive map par dikhata hai.
+
+--------------------------------------------------------------------------------
+B.1: MAP CONTROLS & OVERLAYS (GIS Map ke upar dikhne wale tools)
+--------------------------------------------------------------------------------
+
+1. [SEARCH BOX / GEOCODER] ("Search village, taluka, pin..."):
+   - Kisan ya official poore Bharat ke kisi bhi gaon, taluka ya district ka naam type karke search kar sakte hain (e.g. "Jalna", "Amravati", "Baramati"). Map instantly fly-to animation ke saath wahan zoom ho jaata hai.
+
+2. [BASE MAP SWITCHER]:
+   - Satellite View: High-resolution ESRI / Google satellite aerial imagery.
+   - Street View: Roads, village boundaries aur landmarks dekhne ke liye OpenStreetMap view.
+   - Topo / Terrain View: Elevation aur watershed slope analysis ke liye contour view.
+
+3. [SPECTRAL BAND / SATELLITE LAYER SWITCHER]:
+   - TrueColor (RGB): Normal optical photo jaisa khet aam aankhon se dikhta hai (Red, Green, Blue bands).
+   - NDVI (Normalized Difference Vegetation Index): Chlorophyll aur crop vigor layer. Green = Healthy, Yellow = Moderate, Red/Brown = Stressed.
+   - NDWI (Normalized Difference Water Index): Root zone aur leaf water content. Dark Blue = High Moisture, Orange/Red = Drought/Moisture Deficit.
+
+4. [OPACITY SLIDER] (पारदर्शकता 0% to 100%):
+   - Satellite spectral layer (NDVI/NDWI) aur background natural satellite imagery ke beech transparency adjust karta hai. Isse khet ki actual boundary aur spectral layer dono ek saath dikhte hain.
+
+5. [COMPARE MODE / SPLIT SCREEN TOGGLE] (तुलना मोड):
+   - Is button ko on karne par split-screen slider active ho jaata hai.
+   - Kisan past pass (e.g. 1 mahine pehle) aur aaj ke pass ko side-by-side swipe karke dekh sakta hai ki khet ki halat sudhri ya bigdi.
+
+6. [DRAW FARM BOUNDARY TOOL] (पॉलीगॉन / शेत आखा):
+   - Pencil/Pen icon par click karke kisan map par click-click karke apne khet ke exact 4 ya zyada corners draw kar sakta hai.
+   - Double-click ya first point par click karne par polygon complete hota hai aur automatically:
+     * Area in Hectares & Acres calculate hoti hai.
+     * Latitude/Longitude coordinates save hote hain.
+     * New Farm Plot dashboard me load ho jaata hai.
+
+7. [LOCATE MY FARM GPS BUTTON] (माझे स्थान):
+   - Mobile ya laptop ka current GPS location fetch karke map ko kisan ke khet par turant center karta hai.
+
+8. [INTERACTIVE POLYGON MARKERS & POPUPS]:
+   - Map par draw kiye gaye plot par click karne par popup khulta hai jisme:
+     * Plot Name (e.g. "Kisan Plot 1")
+     * Area (e.g. "2.47 Acres")
+     * Current Crop (e.g. "Cotton")
+     * Health Index (e.g. "78% Optimal")
+     * Direct "Delete Plot" aur "Select" actions hote hain.
+
+--------------------------------------------------------------------------------
+B.2: BOTTOM TEMPORAL SLIDER (TIME-MACHINE SCENE SCRUBBER)
+--------------------------------------------------------------------------------
+
+- [DATE TIMELINE TABS] (e.g., 10 Jul -> 18 Jul -> 26 Jul -> 04 Aug -> Today):
+  * Sentinel-2 satellite har 5 din me khet ke upar se guzarti hai.
+  * Kisan purani dates par click karke dekh sakta hai ki jab buaai (sowing) hui thi tab NDVI kaisa tha, aur barish ke baad fasal me kya badlav aaya.
+  * Right-side "Playback / Scrub" animation bhi chalta hai.
+
+
+================================================================================
+4. SECTION C: RIGHT PANEL — FARMER DASHBOARD DEEP-DIVE
+================================================================================
+
+Yeh farmer ka primary operational hub hai. Yahan har ek card aur option ka detail diya gaya hai:
+
+--------------------------------------------------------------------------------
+C1. REGIONAL LANGUAGE QUICK SELECTOR BAR (भाषा निवडा)
+--------------------------------------------------------------------------------
+- Location: Dashboard ke sabse top par.
+- Options: 5 Regional Languages ke clickable gradient buttons:
+  1. [मराठी] (MR) - Maharashtra Region
+  2. [हिन्दी] (HI) - Central/North India
+  3. [English] (EN) - Global / Technical
+  4. [ಕನ್ನಡ] (KN) - Karnataka Region
+  5. [తెలుగు] (TE) - Andhra & Telangana Region
+- Feature: Saath me khet ka Agro-Climatic Zone tag bhi display hota hai (e.g. "Marathwada Semi-Arid Zone").
+
+--------------------------------------------------------------------------------
+C2. MAIN FARM HEADER, CROP SWITCHER & PLOT MANAGER
+--------------------------------------------------------------------------------
+1. [PLOT NAME & AREA BADGE]:
+   - Khet ka naam (e.g. "माझे शेत" / "Ramesh Farm 1").
+   - Area in Acres & Hectares (e.g. "5.0 Acres (2.02 Ha)").
+   - Location Breadcrumb: Village, Taluka, District, State (e.g. "Badnapur, Jalna, Maharashtra").
+
+2. [MY PLOTS DROPDOWN] (माझे शेत प्लॉट्स):
+   - Agar kisan ke paas 2 ya 3 alag-alag khet hain, to is dropdown par click karke dusre khet par switch kar sakta hai.
+   - Har plot ke aage uski fasal, area aur ek [TRASH ICON] hota hai jisse bekar/test plots delete kiye ja sakte hain (with safety confirmation).
+
+3. [INTERACTIVE CROP SWITCHER STRIP] (सक्रिय पीक निवडा):
+   - Yahan kisan apni fasal instantly switch kar sakta hai:
+     * [Cotton / कापूस / कपास]
+     * [Soybean / सोयाबीन]
+     * [Rice / Paddy / भात / धान]
+     * [Wheat / गहू / गेहूँ]
+     * [Sugarcane / ऊस / गन्ना]
+     * [Maize / मका / मक्का]
+     * [Tur / Arhar / तूर / अरहर]
+   - Button click karte hi poora AI advisory, pest guidelines, expected yield, MSP price aur financial estimation nayi fasal ke anusaar recalculate ho jaata hai!
+
+4. [GOVERNMENT MSP BENCHMARK TAG]:
+   - Chuni gayi fasal ka current Government MSP display hota hai (e.g. "MSP Benchmark: ₹7,200 / Qtl for Cotton", "₹4,892 / Qtl for Soybean").
+
+--------------------------------------------------------------------------------
+C3. VOICE READOUT & AUDIO ADVISORY SYSTEM (आवाज सल्ला)
+--------------------------------------------------------------------------------
+- [LISTEN AUDIO BUTTON] (🔊 आवाज सल्ला ऐका / सुनें):
+  * Unpadh ya buzurg kisanon ke liye button par click karte hi Web SpeechSynthesis API kisan ki local bhasha me bolkar poora advisory padhti hai:
+    "नमस्कार शेतकरी मित्र, तुमच्या शेताचा आरोग्य स्कोअर 78% आहे. कापूस पिकावर रसशोषक किडीचा धोका कमी आहे..."
+  * Audio play hone par button glowing amber "Stop Audio" (थांबवा) me badal jaata hai.
+
+--------------------------------------------------------------------------------
+C4. MULTILINGUAL AUDIT PDF REPORT GENERATOR
+--------------------------------------------------------------------------------
+- [DOWNLOAD AUDIT REPORT BUTTON] (📄 अहवाल डाउनलोड करा / PDF Report):
+  * 1-Click me official KrishiDristi Agricultural Health & PMFBY Compliance PDF download karta hai.
+  * PDF me satellite NDVI map, ML prediction numbers, weather forecast, location context aur spray schedule documented hota hai jise kisan bank loan ya insurance claim ke liye use kar sakta hai.
+  * Fallback Mechanism: Agar backend server down ho to frontend ka built-in `reportClientGenerator.js` 100% offline PDF generate kar deta hai.
+
+--------------------------------------------------------------------------------
+C5. ML INFERENCE ENGINE SCORECARD (LIVE ML MODELS BAR)
+--------------------------------------------------------------------------------
+Yeh section khet ke upar live chal rahe 3 Machine Learning models ka scorecard real-time dikhata hai:
+
+1. [RUN LIVE ML PREDICTION BUTTON] (🔄):
+   - Is button ko dabane par backend khet ke latest coordinates ke liye Google Earth Engine multispectral bands aur OpenWeather API call karke live ML pipeline execute karta hai.
+
+2. [MODEL 1: RANDOM FOREST STRESS CLASSIFIER (`rf_stress.joblib`)]:
+   - Badge: Healthy / Moderate / Severe Stress.
+   - Output: Class Probabilities (e.g. Healthy: 65%, Moderate: 25%, Severe: 10%).
+   - Dynamic Probability Bar chart color coded (Green/Yellow/Red).
+
+3. [MODEL 2: LSTM TEMPORAL AUTOENCODER (`lstm_anomaly.pth`)]:
+   - Badge: "Normal Trajectory" ya "Anomaly Detected".
+   - Output: Reconstruction Error & Temporal Anomaly Score (e.g. 0.28 / 1.00 gauge).
+
+4. [MODEL 3: AGRO-ZONE GEOSPATIAL CALIBRATION]:
+   - Output: District Agro-Climatic Zone name, Soil Profile (e.g. "Black Vertisol Soil") aur Drought Vulnerability Risk.
+
+--------------------------------------------------------------------------------
+C6. DYNAMIC CROP HEALTH STATUS CARD & 0-100 SCORE GAUGE
+--------------------------------------------------------------------------------
+- [BIG HEALTH SCORE GAUGE] (0 to 100):
+  * 75 - 100: Green (उत्कृष्ट / Optimal Canopy Health).
+  * 50 - 74: Amber (लक्ष देणे आवश्यक / Moderate Moisture Stress).
+  * < 50: Red (गंभीर / Critical Stress — Urgent Irrigation Needed).
+- [HEALTH SUMMARY & REASONING]:
+  * Kisan ko seedhe shabdon me batata hai ki satellite scans ke mutabik patti me chlorophyll kaisa hai aur mitti me kitna oalwa bacha hai.
+
+--------------------------------------------------------------------------------
+C7. "WHAT YOU NEED TO DO THIS WEEK" (ML-DRIVEN WEEKLY CHECKLIST)
+--------------------------------------------------------------------------------
+Yeh system ka sabse impactful feature hai. Kisan ko lambi report nahi padhni, seedhe 3 concrete tasks milte hain:
+
+1. [TASK 1: ML STRESS-DRIVEN IRRIGATION PROTOCOL] (💧 ठिबक सिंचन):
+   - Random Forest model ke return par aadharit.
+   - Example: "Random Forest ne Moderate Stress paya. Vertisol soil me 3 ghante drip irrigation chalayein."
+
+2. [TASK 2: CROP & NUTRITION SPRAY REGIMEN] (🌿 पोषण व फवारणी):
+   - Fasal ke stage ke hisab se exact chemical / organic spray.
+   - Example (Cotton): "Potassium Nitrate (13:0:45) @ 10g/L + Planofix @ 0.25ml/L ka chhidkaav karein taki boll drop ruke."
+
+3. [TASK 3: LOCAL KVK / UNIVERSITY PEST DEFENSE] (🛡️ कीड नियंत्रण):
+   - KVK advisory ke mutabik pink bollworm ya whiteflies ke liye pheromone traps ki sankhya.
+
+4. [INTERACTIVE CHECKBOXES & RECOVERY BOOST]:
+   - Kisan jaise hi kisi task par click karta hai:
+     * Task strike-through (line-through) ho jaata hai.
+     * Bottom banner me "+12% Crop Recovery Boost" score add hota hai, jisse kisan ko kaam karne ka motivation milta hai!
+
+--------------------------------------------------------------------------------
+C8. AI AGRONOMIST INTERACTIVE CHATBOT (कृषी सहाय्यक Q&A)
+--------------------------------------------------------------------------------
+- [CHATBOT CARD] ("Ask KrishiDrishti AI Agronomist"):
+  * Google Gemini API powered live assistant.
+  * Input Box: Kisan kisi bhi bhasha me apna sawal type kar sakta hai (e.g. "कापसावर बोंडअळीसाठी काय करावे?").
+  * [ASK AI BUTTON]: Submit karne par LLM current plot ke context (Crop, NDVI, Weather, Soil) ko dekh kar precise recommendation generate karta hai.
+  * [CLEAR BUTTON]: Purane answer ko dismiss karne ke liye.
+
+--------------------------------------------------------------------------------
+C9. CROP YIELD, MSP MARKET VALUE & LIVE WEATHER TELEMETRY (3 CARDS)
+--------------------------------------------------------------------------------
+1. [TOTAL HARVEST ESTIMATION CARD] (एकूण अपेक्षित उत्पादन):
+   - Total Quintals (e.g. "44.0 Qtl").
+   - Yield Rate (e.g. "~8.9 Qtl/Acre").
+   - Baseline comparison (+/- % vs 5-year historical district average).
+
+2. [ESTIMATED MSP MARKET VALUE CARD] (अपेक्षित बाजार भाव):
+   - Kisan ki fasal ki Government MSP par kul kimat (e.g. "₹3,16,800").
+   - Calculation: Total Estimated Quintals × Government MSP Rate.
+
+3. [LIVE WEATHER FORECAST CARD] (हवामान अंदाज):
+   - Live Temperature (e.g. "31.5°C — Moderate Weather").
+   - 30-Day Estimated Rainfall Accumulation (e.g. "24 mm").
+
+--------------------------------------------------------------------------------
+C10. NDVI MULTI-TEMPORAL VEGETATION HEALTH AREA CHART
+--------------------------------------------------------------------------------
+- Interactive Area Chart jo picchle 4 satellite passes se lekar aaj tak ki fasal ki growth curve dikhata hai.
+- Chart me 50% par Red Dotted Line hoti hai (Critical Risk Threshold).
+- Green/Amber/Rose dynamic smooth gradient se kisan ko trend samajh aa jata hai ki fasal sudhar rahi hai ya gir rahi hai.
+
+--------------------------------------------------------------------------------
+C11. EXPLAINABLE AI (XAI) "WHY THIS ALERT?" PANEL
+--------------------------------------------------------------------------------
+- [WHY THIS ALERT BUTTON] (❓ हा अलर्ट का आला? / Why This Alert?):
+  * Is button ko click karne par XAI panel khulta hai jisme 3 tabs hote hain:
+    1. 'Farmer View': Simple bhasha me summary ki Sentinel-2 NDVI aur rainfall ke kitne % contribution se alert generate hua.
+    2. 'SHAP Weights': Horizontal bar chart jo SHAP (Shapley Additive Explanations) weights dikhata hai (NDVI: 42%, Rainfall: 26%, NDWI: 18%, Temp: 9%, Soil: 5%).
+    3. 'Checkpoints & Arch': Active ML model checkpoints ke technical details (`rf_stress.joblib`, `lstm_anomaly_best.pth`, `unet_water_best.pth`).
+
+--------------------------------------------------------------------------------
+C12. WHATSAPP SHARE & KISAN CALL CENTER HELPLINE
+--------------------------------------------------------------------------------
+1. [SHARE VIA WHATSAPP BUTTON] (📲 WhatsApp वर शेअर करा):
+   - 1-Click me khet ka health score, expected yield aur weekly advisory WhatsApp par pre-formatted text ke roop me local farmers group ya dukaandar ko bhejne ke liye khol deta hai.
+
+2. [EMERGENCY KISAN CALL CENTER HELPLINE] (📞 1800-180-1551):
+   - Direct clickable telephone link (`tel:18001801551`). Mobile par tap karte hi Bharat Sarkar ke toll-free Kisan Call Center par call connect ho jaati hai.
+
+
+================================================================================
+5. HOW EVERYTHING CONNECTS: A FARMER'S STEP-BY-STEP USER JOURNEY
+================================================================================
+
+1. Step 1: Kisan page kholta hai aur apni bhasha (e.g. Marathi/Hindi) chunta hai.
+2. Step 2: Map par apna khet draw karta hai ya search box se apna gaon nikalta hai.
+3. Step 3: Fasal switch karta hai (e.g. Cotton).
+4. Step 4: Health Score aur "What You Need To Do This Week" checklist padhta hai ya [Listen Audio] par click karke aawaz me sunta hai.
+5. Step 5: Khet me paani/khad dalne ke baad checklist par tap karke task complete mark karta hai (+12% Recovery boost milta hai).
+6. Step 6: Kisi bimari par sawal ho to AI Agronomist chatbot se chat karta hai.
+7. Step 7: [Download Report] se audit PDF save karta hai aur [WhatsApp] se apne agri-officer ya pariwar ko share karta hai.
+
+================================================================================
+END OF FARMER VIEW COMPLETE OPTIONS GUIDE
+================================================================================
