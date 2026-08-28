@@ -192,33 +192,79 @@ Return ONLY a valid JSON array of 3 objects (no markdown fences, just pure JSON)
         lang_full = LANG_NAMES.get(lang, "English / Hindi as asked")
 
         location = f"{aoi_data.get('village', 'Field')}, {aoi_data.get('district', 'Jalna')}, {aoi_data.get('state', 'Maharashtra')}"
-        
-        ml_context_str = ""
-        if ml_prediction:
-            stress_lbl = ml_prediction.get("ml_stress_classification", {}).get("stress_label", "Moderate Stress")
-            yield_pct = ml_prediction.get("yield_change_pct", -15.0)
-            ml_context_str = f"- ML Stress Classification: {stress_lbl}\n- ML Predicted Yield Trend: {yield_pct:+.1f}%\n"
+
+        # ── Pull today's exact telemetry & ML diagnosis from the live prediction ──
+        snapshot = (ml_prediction or {}).get("input_snapshot_json", {}) or {}
+        ndvi_today = ndvi if ndvi is not None else snapshot.get("mean_ndvi", 0.48)
+        ndwi_today = snapshot.get("mean_ndwi", -0.15)
+        rain_today = rain_mm if rain_mm is not None else snapshot.get("rainfall_mm", 360)
+        temp_today = temp_c if temp_c is not None else snapshot.get("temp_avg_c", 29.2)
+
+        rf = (ml_prediction or {}).get("ml_stress_classification", {}) or {}
+        lstm = (ml_prediction or {}).get("ml_anomaly", {}) or {}
+        loc_ctx = (ml_prediction or {}).get("location_context", {}) or {}
+        soil_type = loc_ctx.get("soil_type", snapshot.get("location_context", {}).get("soil_type", "Regional Soil Profile"))
+        agro_zone = loc_ctx.get("agro_zone", snapshot.get("location_context", {}).get("agro_zone", f"{aoi_data.get('district', 'Local')} Agro-Climatic Zone"))
+        kvk = loc_ctx.get("kvk_station", snapshot.get("location_context", {}).get("kvk_station", f"KVK {aoi_data.get('district', 'Regional')}"))
+
+        rf_label = rf.get("stress_label", "Moderate Stress")
+        rf_class = rf.get("stress_class_id", 1)
+        rf_probs = rf.get("probabilities", {})
+        p_severe = round(rf_probs.get("severe_stress", 0.10) * 100)
+        p_moderate = round(rf_probs.get("moderate_stress", 0.50) * 100)
+        p_healthy = round(rf_probs.get("healthy", 0.35) * 100)
+
+        lstm_detected = lstm.get("anomaly_detected", False)
+        lstm_score = lstm.get("anomaly_score", 0.20)
+        lstm_status = lstm.get("status_text", "Normal Trajectory")
+
+        yield_pct = (ml_prediction or {}).get("yield_change_pct", -15.0)
+        pred_yield = (ml_prediction or {}).get("predicted_yield_kg_ha")
+
+        # Interpret today's spectral health so the answer can be grounded in it.
+        if ndwi_today <= -0.30 or ndvi_today < 0.25:
+            spectral_health = "Severe moisture stress / very dry canopy (NDWI very low)"
+        elif ndwi_today >= -0.15 and ndvi_today >= 0.55:
+            spectral_health = "Healthy / well-watered canopy (good NDVI & NDWI)"
+        elif ndvi_today < 0.40:
+            spectral_health = "Moderate canopy stress / thinning vegetation"
+        else:
+            spectral_health = "Moderate to good canopy with adequate water balance"
+
+        ml_context_str = (
+            f"- Sentinel-2 NDVI (today): {ndvi_today:.2f}  → {spectral_health}\n"
+            f"- Sentinel-2 NDWI (today): {ndwi_today:.2f}  (canopy/soil water index)\n"
+            f"- Random Forest Stress: {rf_label} (class {rf_class}); "
+            f"probs: Healthy {p_healthy}% | Moderate {p_moderate}% | Severe {p_severe}%\n"
+            f"- LSTM Anomaly: {'Detected' if lstm_detected else 'None'} (score {lstm_score:.2f} / 1.00; {lstm_status})\n"
+            f"- ML Predicted Yield Trend: {yield_pct:+.1f}%\n"
+            f"- Predicted Yield: {pred_yield} kg/ha\n"
+            f"- Agro-Climatic Zone: {agro_zone}\n"
+            f"- Soil: {soil_type}\n"
+            f"- KVK Hub: {kvk}\n"
+        )
 
         prompt = f"""
 You are KrishiDrishti AI's Expert Virtual Agronomist (कृषि विशेषज्ञ).
-The farmer is asking you a direct question about their farm.
+The farmer is asking you a direct question about their farm TODAY.
+Ground your entire answer in the REAL-TIME telemetry below — the specific NDVI, NDWI and ML diagnosis measured on this plot right now. Do NOT answer generically; use these exact numbers.
 
-REAL-TIME FIELD TELEMETRY & ML CONTEXT:
+REAL-TIME FIELD TELEMETRY & ML CONTEXT (measured today):
 - Location: {location}
 - Active Crop: {crop_type.upper()}
-- Sentinel-2 NDVI: {ndvi:.2f} (Vegetation Health)
-- Ambient Temperature: {temp_c:.1f}°C
-- Forecast Rainfall: {rain_mm:.0f} mm
+- Ambient Temperature: {temp_today:.1f}°C
+- Forecast Rainfall: {rain_today:.0f} mm
 {ml_context_str}- Output Language: {lang_full}
 
 FARMER'S QUESTION:
 "{question}"
 
 INSTRUCTIONS FOR YOUR ANSWER:
-1. Answer the farmer's question directly, accurately, and practically. Do NOT give generic unrelated answers.
-2. Reply in the farmer's chosen language: {lang_full} (If the farmer asked in Hindi or Marathi, answer in natural, clear Devanagari script).
+1. Answer the farmer's question directly, accurately, and practically, using this plot's ACTUAL NDVI ({ndvi_today:.2f}) and NDWI ({ndwi_today:.2f}) and the ML diagnosis ({rf_label}). If the farmer asks about irrigation/water, base it on NDWI ({ndwi_today:.2f}) and soil ({soil_type}). If they ask about fertilizers, base dosages on the crop stage and this soil. If they ask about pests/diseases, factor in current temperature ({temp_today:.1f}°C) and NDWI.
+2. Reply in the farmer's chosen language: {lang_full}.
 3. If they ask about pests, diseases, irrigation, or fertilizers for {crop_type.upper()}, give exact brand-neutral chemical/organic formulations with precise measurements (e.g. ml/liter or kg/acre).
 4. Format with short bullet points so it is easy to read on a mobile screen.
+5. If the farmer's question is about the current stress/anomaly ({rf_label}; {'anomaly detected' if lstm_detected else 'no anomaly'}), explain what those numbers mean and give a concrete action plan.
 """
         try:
             url = f"{self.base_url}/{self.model}:generateContent?key={self.api_key}"
