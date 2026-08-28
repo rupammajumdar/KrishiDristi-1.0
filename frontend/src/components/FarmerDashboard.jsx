@@ -393,6 +393,48 @@ function generateLocationAwareTasks({ aoi, prediction, cropKey, lang, healthScor
     });
   }
 
+  // ── Task 4: Soil Health, Inter-cultivation & Weeding ──
+  rawTasks.push({
+    id: 'loc-task-4',
+    badge: {
+      en: `🌱 Soil Aeration & Weed Clearance (${soilType})`,
+      mr: `🌱 तण नियंत्रण व कोळपणी (${soilType})`,
+      hi: `🌱 निराई-गुड़ाई एवं खरपतवार नियंत्रण (${soilType})`,
+      kn: `🌱 ಮಣ್ಣಿನ ನಿರ್ವಹಣೆ ಮತ್ತು ಕಳೆ ತೆಗೆಯುವುದು`,
+      te: `🌱 నేల యాజమాన్యం & కలుపు నివారణ`
+    },
+    text: {
+      en: `Perform shallow weeding and inter-cultivation across ${village} plots to loosen ${soilType}, enhance root-zone oxygenation, and accelerate nitrogen uptake.`,
+      mr: `${village} मधील शेतात हलकी कोळपणी करून तण काढून घ्या, ज्यामुळे ${soilType} मध्ये मुळांना हवा मिळून नत्र शोषण वेगाने होईल.`,
+      hi: `${village} के खेतों में हल्की निराई-गुड़ाई करके खरपतवार हटाएं, जिससे ${soilType} में जड़ों का विकास और पोषण अंतग्रहण सुधरेगा.`,
+      kn: `${village} ನಲ್ಲಿ ಕಳೆಗಳನ್ನು ತೆಗೆದು ಮಣ್ಣನ್ನು ಹಗುರಗೊಳಿಸಿ.`,
+      te: `${village} లో కలుపు మొక్కలను తొలగించి నేలను దున్నండి.`
+    },
+    urgent: false,
+    icon: Sprout
+  });
+
+  // ── Task 5: Weather Adaptation & Protective Micro-Climate Shielding ──
+  rawTasks.push({
+    id: 'loc-task-5',
+    badge: {
+      en: `🌤️ Weather & Micro-Climate Protocol (${temp.toFixed(1)}°C in ${district})`,
+      mr: `🌤️ हवामान अनुकूलन व उष्णता संरक्षण (${district})`,
+      hi: `🌤️ मौसम अनुकूलन एवं तापमान सुरक्षा (${district})`,
+      kn: `🌤️ ವಾತಾವರಣ ರಕ್ಷಣೆ ಮುನ್ನೆಚ್ಚರಿಕೆ`,
+      te: `🌤️ వాతావరణ రక్షణ చర్యలు`
+    },
+    text: {
+      en: `Ambient temp is ${temp.toFixed(1)}°C with ${rainfall}mm 30-day forecast rain in ${district}. Spray 1500 PPM Neem Oil @ 3ml/L in evening to protect leaves from sun-scald and fungal spores.`,
+      mr: `${district} मध्ये तापमान ${temp.toFixed(1)}°C आहे. पानांचे ऊन व रोगांपासून संरक्षण करण्यासाठी संध्याकाळी १५०० पीपीएम निंबोळी अर्क ३ मिली/लिटर फवारा.`,
+      hi: `${district} में तापमान ${temp.toFixed(1)}°C है. पत्तियों को धूप एवं फफूंद से बचाने हेतु शाम को 1500 PPM नीम तेल @ 3ml/L का छिड़काव करें.`,
+      kn: `${district} ನಲ್ಲಿ ಶಾಖದಿಂದ ಬೆಳೆಯನ್ನು ರಕ್ಷಿಸಲು ಸಂಜೆ नीम എಣ್ಣೆ ಸಿಂಪಡಿಸಿ.`,
+      te: `${district} లో ఎండ తీవ్రత నుండి పంటను కాపాడటానికి వేప నూనె స్ప్రే చేయండి.`
+    },
+    urgent: false,
+    icon: Sun
+  });
+
   return {
     soilType,
     zoneName,
@@ -574,8 +616,9 @@ export default function FarmerDashboard({
   });
   const baseHealthScore = Math.max(15, Math.min(98, baseHealth));
 
+  const activeTaskList = (aiTasks && aiTasks.length > 0) ? aiTasks : locationAgroProfile.tasks;
   const completedCount = Object.values(completedTasks).filter(Boolean).length;
-  const totalTasks = locationAgroProfile.tasks.length || 3;
+  const totalTasks = activeTaskList.length || 5;
   const taskRecoveryBonus = Math.round((completedCount / totalTasks) * 12); // Farmer gets visible recovery boost for completing tasks
   const healthScore = Math.max(15, Math.min(98, baseHealthScore + taskRecoveryBonus));
 

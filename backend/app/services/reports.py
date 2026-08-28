@@ -218,7 +218,9 @@ class ReportGenerator:
                 fallback_adv = (
                     "<b>1. Precision Irrigation:</b> Sentinel-2 NDWI reflects declining root zone moisture. Initiate 3-4 hours drip irrigation before 10 AM.<br/>"
                     "<b>2. Nutrient Foliar Feeding:</b> Spray 1% Potassium Nitrate (13:0:45) @ 10g/L to preserve flower squares and maintain vegetative vigor.<br/>"
-                    "<b>3. Integrated Pest Surveillance:</b> Inspect lower leaves for sucking pests and install pheromone traps as per local KVK protocol."
+                    "<b>3. Integrated Pest Surveillance:</b> Inspect lower leaves for sucking pests and install pheromone traps as per local KVK protocol.<br/>"
+                    "<b>4. Soil Aeration & Weeding:</b> Perform shallow hoeing between crop rows to loosen root-zone soil and boost oxygenation.<br/>"
+                    "<b>5. Weather Stress Shielding:</b> Spray 1500 PPM Neem Oil @ 3ml/L in the evening to protect foliage against heat scald and fungal spores."
                 )
                 story.append(Paragraph(fallback_adv, body_style))
         elif persona == "government":

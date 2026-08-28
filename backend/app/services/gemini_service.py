@@ -80,7 +80,7 @@ class GeminiAgronomistService:
         prompt = f"""
 You are KrishiDrishti AI's Expert Senior Agronomist for Indian Agriculture.
 The platform's Machine Learning models have executed inference on real-time satellite telemetry and weather for a farm plot.
-Generate exactly 3 actionable, prioritized tasks for "WHAT TO DO THIS WEEK" for the farmer growing {crop_type.upper()}.
+Generate exactly 5 comprehensive, prioritized, actionable tasks for "WHAT TO DO THIS WEEK" for the farmer growing {crop_type.upper()}.
 
 CRITICAL: Your recommendations MUST directly address the findings and diagnosis of the ML models below!
 
@@ -103,34 +103,49 @@ CRITICAL: Your recommendations MUST directly address the findings and diagnosis 
    - Output Language: {lang_full}
 
 === INSTRUCTIONS FOR TASK GENERATION ===
-1. Task 1 MUST address the primary stress/anomaly indicated by the Random Forest & LSTM models (e.g. if Severe Stress or High Anomaly, mandate urgent drip/irrigation schedule and moisture conservation; if Healthy, prescribe maintenance water regime).
-2. Task 2 MUST be a crop-specific nutrient/spray booster tailored to {crop_type.upper()} (e.g. 19:19:19, 0:52:34, 13:0:45 Potassium Nitrate, or micronutrients) with exact dosages per litre/acre to mitigate the predicted {yield_dev} loss.
-3. Task 3 MUST be a regional pest/disease protection or field practice recommended by {kvk} for {crop_type.upper()} under current temp ({temp_c:.1f}°C) and NDWI ({ndwi:.2f}).
-4. Write ALL titles and subtitles strictly in {lang_full}.
-5. Include precise measurements (e.g. grams/litre, hours of drip, kg/acre).
+1. Task 1 MUST address Drip Irrigation & Water Management based on Random Forest & NDWI ({ndwi:.2f}).
+2. Task 2 MUST be Crop-Specific Foliar Nutrition (e.g. 19:19:19, 0:52:34, 13:0:45 Potassium Nitrate, Boron/Micronutrients) with exact dosages per litre/acre to mitigate predicted {yield_dev} loss.
+3. Task 3 MUST be Integrated Pest & Disease Scouting (sucking pests, bollworm, leaf spot) recommended by {kvk} for {crop_type.upper()} at {temp_c:.1f}°C.
+4. Task 4 MUST address Soil Health, Weeding & Inter-cultivation (hoeing, root aeration, weed clearance in {soil_info}).
+5. Task 5 MUST address Weather Adaptation & Stress Shielding (protection against high heat/excess rain, bio-stimulant or Neem spray).
+6. Write ALL titles and subtitles strictly in {lang_full}. Include precise dosages (g/L, ml/L, hours of drip, kg/acre).
 
-Return ONLY a valid JSON array of 3 objects (no markdown fences, just pure JSON):
+Return ONLY a valid JSON array of 5 objects (no markdown fences, just pure JSON):
 [
   {{
     "id": 1,
-    "title": "Action Title in {lang_full}",
-    "subtitle": "Clear, practical guidance with exact dosage and timing in {lang_full}",
+    "title": "Drip Irrigation Title in {lang_full}",
+    "subtitle": "Clear drip schedule and water timing in {lang_full}",
     "urgency": "{'Urgent' if (rf_class == 0 or lstm_anomaly_detected) else 'Moderate'}",
     "icon": "Droplets"
   }},
   {{
     "id": 2,
-    "title": "Nutrition Title in {lang_full}",
+    "title": "Foliar Nutrition Title in {lang_full}",
     "subtitle": "Fertilizer spray with exact ratio and dosage in {lang_full}",
     "urgency": "{'High' if (rf_class != 2) else 'Routine'}",
     "icon": "Sprout"
   }},
   {{
     "id": 3,
-    "title": "Protection Title in {lang_full}",
+    "title": "Pest Protection Title in {lang_full}",
     "subtitle": "Pest/Disease defense with formulation dosage in {lang_full}",
     "urgency": "Routine",
     "icon": "ShieldCheck"
+  }},
+  {{
+    "id": 4,
+    "title": "Soil & Weeding Title in {lang_full}",
+    "subtitle": "Hoeing and inter-cultivation advice in {lang_full}",
+    "urgency": "Routine",
+    "icon": "Sprout"
+  }},
+  {{
+    "id": 5,
+    "title": "Weather Shielding Title in {lang_full}",
+    "subtitle": "Micro-climate adaptation and protective spray in {lang_full}",
+    "urgency": "Routine",
+    "icon": "Sun"
   }}
 ]
 """
@@ -302,6 +317,8 @@ INSTRUCTIONS FOR YOUR ANSWER:
         if ml_anomaly and ml_anomaly.get("anomaly_detected"):
             is_severe = True
 
+        crop_u = crop.upper()
+
         if lang == "mr":
             if is_severe:
                 return [
@@ -314,17 +331,31 @@ INSTRUCTIONS FOR YOUR ANSWER:
                     },
                     {
                         "id": 2,
-                        "title": "पोटॅशियम नायट्रेट (१३:०:४५) फवारणी",
-                        "subtitle": "१० ग्रॅम प्रति लिटर पाण्यात मिसळून फवारा जेणेकरून पानांची गळ थांबेल व दुष्काळ प्रतिकारशक्ती वाढेल.",
+                        "title": f"{crop_u} साठी पोटॅशियम नायट्रेट (१३:०:४५) फवारणी",
+                        "subtitle": "१० ग्रॅम प्रति लिटर पाण्यात मिसळून फवारा जेणेकरून पानांची व पातेगळ थांबेल व दुष्काळ प्रतिकारशक्ती वाढेल.",
                         "urgency": "तातडीचे",
                         "icon": "Sprout",
                     },
                     {
                         "id": 3,
-                        "title": "कीटक व बोंडअळी / कीड निरीक्षण",
-                        "subtitle": "पानांच्या खालील बाजूस पांढरी माशी व रसशोषक किडी तपासा. गरज भासल्यास ५% निंबोळी अर्क फवारा.",
+                        "title": "रसशोषक किडी व बोंडअळी / रोग निरीक्षण",
+                        "subtitle": "पानांच्या खालील बाजूस पांढरी माशी व मावा तपासा. गरज भासल्यास ५% निंबोळी अर्क ३ मिली/लिटर फवारा.",
                         "urgency": "नियमित",
                         "icon": "ShieldCheck",
+                    },
+                    {
+                        "id": 4,
+                        "title": "तण नियंत्रण व कोळपणी (हवा खेळती ठेवा)",
+                        "subtitle": "मुळांभोवती तण काढून घ्या व हलकी कोळपणी करा जेणेकरून जमिनीत ऑक्सिजन व नत्र शोषण सुधारेल.",
+                        "urgency": "नियमित",
+                        "icon": "Sprout",
+                    },
+                    {
+                        "id": 5,
+                        "title": "उष्णता ताण संरक्षण व सूक्ष्म अन्नद्रव्य फवारणी",
+                        "subtitle": f"तापमान {temp_c:.1f}°C असल्याने संध्याकाळी बाष्पीभवन रोखण्यासाठी चिलेटेड झिंक @ १.५ ग्रॅम/लिटर फवारा.",
+                        "urgency": "नियमित",
+                        "icon": "Sun",
                     },
                 ]
             return [
@@ -337,17 +368,31 @@ INSTRUCTIONS FOR YOUR ANSWER:
                 },
                 {
                     "id": 2,
-                    "title": "१९:१९:१९ विद्राव्य खताची मात्रा",
+                    "title": f"{crop_u} साठी १९:१९:१९ विद्राव्य खताची मात्रा",
                     "subtitle": "५ ग्रॅम प्रति लिटर पाण्याने फवारणी करून शाकीय वाढ व फुलोरा मजबूत करा.",
                     "urgency": "नियमित",
                     "icon": "Sprout",
                 },
                 {
                     "id": 3,
-                    "title": "किडींचे एकात्मिक नियंत्रण",
-                    "subtitle": "प्रति एकर ५ कामगंध सापळे लावा आणि नियमित निरीक्षण ठेवा.",
+                    "title": "किडींचे एकात्मिक नियंत्रण (KVK सल्ला)",
+                    "subtitle": "प्रति एकर ५ कामगंध सापळे व पिवळे चिकट सापळे लावा आणि नियमित निरीक्षण ठेवा.",
                     "urgency": "नियमित",
                     "icon": "ShieldCheck",
+                },
+                {
+                    "id": 4,
+                    "title": "जमीन मशागत व मुळांची भर देणे",
+                    "subtitle": "झाडांच्या ओळीत हलकी खुरपणी करून मुळांना मातीची भर द्या जेणेकरून झाड मजबूत उभे राहील.",
+                    "urgency": "नियमित",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 5,
+                    "title": "जैविक फवारणी व पीक आरोग्य संरक्षण",
+                    "subtitle": "१५०० पीपीएम निंबोळी अर्क ३ मिली/लिटर फवारून किडींच्या अंडी व पिल्लांचे नियंत्रण करा.",
+                    "urgency": "नियमित",
+                    "icon": "Sun",
                 },
             ]
         elif lang == "hi":
@@ -356,46 +401,227 @@ INSTRUCTIONS FOR YOUR ANSWER:
                     {
                         "id": 1,
                         "title": "ML अलर्ट: 48 घंटे के भीतर ड्रिप सिंचाई करें",
-                        "subtitle": f"रैंडम फॉरेस्ट मॉडल ने गंभीर जल तनाव पाया (NDWI: {ndwi:.2f}, {temp_c:.1f}°C). नमी बचाने के लिए तुरंत सिंचाई करें.",
+                        "subtitle": f"रैंडम फॉरेस्ट मॉडल ने गंभीर जल तनाव पाया (NDWI: {ndwi:.2f}, {temp_c:.1f}°C). नमी बचाने के लिए तुरंत 3 घंटे सिंचाई करें.",
                         "urgency": "अति-आवश्यक",
                         "icon": "Droplets",
                     },
                     {
                         "id": 2,
-                        "title": "पोटेशियम नाइट्रेट (13:0:45) का पर्णीय छिड़काव",
-                        "subtitle": "10 ग्राम प्रति लीटर पानी में घोलकर छिड़कें ताकि फसल की सूखा सहनशीलता बढ़े.",
+                        "title": f"{crop_u} हेतु पोटेशियम नाइट्रेट (13:0:45) का छिड़काव",
+                        "subtitle": "10 ग्राम प्रति लीटर पानी में घोलकर छिड़कें ताकि फूल/फल झड़ने से बचें और सूखा सहनशीलता बढ़े.",
                         "urgency": "आवश्यक",
                         "icon": "Sprout",
                     },
                     {
                         "id": 3,
                         "title": "रस चूसक कीट एवं सुंडी निगरानी",
-                        "subtitle": "पत्तियों की निचली सतह पर सफेद मक्खी की जांच करें. आवश्यकतानुसार 5% नीम तेल स्प्रे करें.",
+                        "subtitle": "पत्तियों की निचली सतह पर सफेद मक्खी और चेपा की जांच करें. आवश्यकतानुसार 5% नीम तेल स्प्रे करें.",
                         "urgency": "नियमित",
                         "icon": "ShieldCheck",
+                    },
+                    {
+                        "id": 4,
+                        "title": "खरपतवार नियंत्रण एवं निराई-गुड़ाई",
+                        "subtitle": "जड़ों के आसपास से खरपतवार निकालें और हल्की गुड़ाई करें ताकि मृदा में हवा का प्रवाह बढ़े.",
+                        "urgency": "नियमित",
+                        "icon": "Sprout",
+                    },
+                    {
+                        "id": 5,
+                        "title": "तापमान तनाव सुरक्षा एवं सूक्ष्म पोषक तत्व",
+                        "subtitle": f"तापमान {temp_c:.1f}°C होने के कारण शाम को चिलेटेड जिंक @ 1.5 ग्राम/लीटर का स्प्रे करें.",
+                        "urgency": "नियमित",
+                        "icon": "Sun",
                     },
                 ]
             return [
                 {
                     "id": 1,
                     "title": "नियमित ड्रिप सिंचाई चक्र",
-                    "subtitle": f"NDVI {ndvi:.2f} स्वस्थ स्तर पर है. 2 घंटे का नियमित सिंचाई चक्र बनाए रखें.",
+                    "subtitle": f"NDVI {ndvi:.2f} स्वस्थ स्तर पर है. शाम के समय 2 घंटे का नियमित सिंचाई चक्र बनाए रखें.",
                     "urgency": "सामान्य",
                     "icon": "Droplets",
                 },
                 {
                     "id": 2,
-                    "title": "19:19:19 घुलनशील पोषक तत्व स्प्रे",
-                    "subtitle": "5 ग्राम प्रति लीटर पानी के साथ फसल की वनस्पति वृद्धि को बढ़ावा दें.",
+                    "title": f"{crop_u} हेतु 19:19:19 घुलनशील पोषक तत्व स्प्रे",
+                    "subtitle": "5 ग्राम प्रति लीटर पानी के साथ फसल की वनस्पति वृद्धि और शाखाओं को बढ़ावा दें.",
                     "urgency": "सामान्य",
                     "icon": "Sprout",
                 },
                 {
                     "id": 3,
                     "title": "एकीकृत कीट प्रबंधन (KVK सलाह)",
-                    "subtitle": "प्रति एकड़ 5 फेरोमोन ट्रैप लगाएं और कीट प्रकोप पर नजर रखें.",
+                    "subtitle": "प्रति एकड़ 5 फेरोमोन ट्रैप एवं पीले चिपचिपे कार्ड लगाएं और कीट प्रकोप पर नजर रखें.",
                     "urgency": "नियमित",
                     "icon": "ShieldCheck",
+                },
+                {
+                    "id": 4,
+                    "title": "मृदा स्वास्थ्य एवं हल्की निराई",
+                    "subtitle": "पौधों की कतारों के बीच खरपतवार साफ करें और मिट्टी को भुरभुरी बनाएं.",
+                    "urgency": "नियमित",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 5,
+                    "title": "जैविक सुरक्षा (नीम तेल छिड़काव)",
+                    "subtitle": "1500 PPM नीम तेल @ 3ml/L का छिड़काव कर कीटों के अंडे व बच्चों को रोकें.",
+                    "urgency": "नियमित",
+                    "icon": "Sun",
+                },
+            ]
+
+        elif lang == "kn":
+            if is_severe:
+                return [
+                    {
+                        "id": 1,
+                        "title": "ML ಸೂಚನೆ: 24-48 ಗಂಟೆಗಳಲ್ಲಿ ಹನಿ ನೀರಾವರಿ ನೀಡಿ",
+                        "subtitle": f"ರ‍್ಯಾಂಡಮ್ ಫಾರೆಸ್ಟ್ ಮಾದರಿಯು ತೀವ್ರ ತೇವಾಂಶ ಕೊರತೆಯನ್ನು ಪತ್ತೆ ಮಾಡಿದೆ (NDWI: {ndwi:.2f}, {temp_c:.1f}°C). ಬೆಳೆ ರಕ್ಷಣೆಗೆ 3 ಗಂಟೆ ನೀರಾವರಿ ನೀಡಿ.",
+                        "urgency": "ಅತಿ-ಅಗತ್ಯ",
+                        "icon": "Droplets",
+                    },
+                    {
+                        "id": 2,
+                        "title": f"{crop_u} ಗೆ ಪೊಟ್ಯಾಸಿಯಮ್ ನೈಟ್ರೇಟ್ (13:0:45) ಸಿಂಪಡಣೆ",
+                        "subtitle": "10 ಗ್ರಾಂ/ಲೀಟರ್ ನೀರಿನಲ್ಲಿ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ, ಹೂವು ಮತ್ತು ಕಾಯಿ ಉದುರುವುದನ್ನು ತಡೆಯಿರಿ.",
+                        "urgency": "ಅಗತ್ಯ",
+                        "icon": "Sprout",
+                    },
+                    {
+                        "id": 3,
+                        "title": "ಕೀಟಗಳ ಪರಿಶೀಲನೆ ಮತ್ತು ಮೋಹಕ ಬಲೆಗಳ ಅಳವಡಿಕೆ",
+                        "subtitle": "ಎಲೆಗಳ ಕೆಳಭಾಗದಲ್ಲಿ ನುಸಿ/ಬಿಳಿ ನೊಣಗಳನ್ನು ಪರಿಶೀಲಿಸಿ. ಎಕರೆಗೆ 5 ಮೋಹಕ ಬಲೆಗಳನ್ನು ಹಾಕಿ.",
+                        "urgency": "ಸಾಮಾನ್ಯ",
+                        "icon": "ShieldCheck",
+                    },
+                    {
+                        "id": 4,
+                        "title": "ಮಣ್ಣಿನ ಆಮ್ಲಜನಕೀಕರಣ ಮತ್ತು ಕಳೆ ನಿರ್ವಹಣೆ",
+                        "subtitle": "ಸಾಲುಗಳ ನಡುವೆ ಕಳೆಗಳನ್ನು ತೆಗೆದು ಮಣ್ಣನ್ನು ಹಗುರಗೊಳಿಸಿ ಕಾಯಿಸಿ.",
+                        "urgency": "ಸಾಮಾನ್ಯ",
+                        "icon": "Sprout",
+                    },
+                    {
+                        "id": 5,
+                        "title": "ಶಾಖ ನಿಯಂತ್ರಣ ಮತ್ತು ಜೈವಿಕ नीम ಎಣ್ಣೆ ಸಿಂಪಡಣೆ",
+                        "subtitle": "1500 PPM नीम ಎಣ್ಣೆಯನ್ನು 3ml/L ಸಾಂದ್ರತೆಯಲ್ಲಿ ಸಂಜೆ ಸಿಂಪಡಿಸಿ.",
+                        "urgency": "ಸಾಮಾನ್ಯ",
+                        "icon": "Sun",
+                    },
+                ]
+            return [
+                {
+                    "id": 1,
+                    "title": "ನಿಯಮಿತ ಹನಿ ನೀರಾವರಿ ವೇಳಾಪಟ್ಟಿ",
+                    "subtitle": f"NDVI {ndvi:.2f} ಉತ್ತಮವಾಗಿದೆ. ಸಂಜೆ 2 ಗಂಟೆಗಳ ಕಾಲ ನಿಯಮಿತ ನೀರಾವರಿ ನಿರ್ವಹಿಸಿ.",
+                    "urgency": "ಸಾಮಾನ್ಯ",
+                    "icon": "Droplets",
+                },
+                {
+                    "id": 2,
+                    "title": f"{crop_u} ಗೆ 19:19:19 ನೀರಿನಲ್ಲಿ ಕರಗುವ ಗೊಬ್ಬರ ಸಿಂಪಡಣೆ",
+                    "subtitle": "ಬೆಳೆಯ ಕಾಯಿ ಮತ್ತು ಕೊಂಬೆಗಳ ಬೆಳವಣಿಗೆಗೆ 5g/L ಸಿಂಪಡಿಸಿ.",
+                    "urgency": "ಸಾಮಾನ್ಯ",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 3,
+                    "title": "ಸಮಗ್ರ ಕೀಟ ನಿರ್ವಹಣೆ (KVK ಸಲಹೆ)",
+                    "subtitle": "ಹಳದಿ ಅಂಟು ಹಾಳೆಗಳು ಮತ್ತು ಕೀಟ ಬಲೆಗಳನ್ನು ಇರಿಸಿ ಕೀಟಗಳ ಮೇಲೆ ನಿಗಾ ಇರಿಸಿ.",
+                    "urgency": "ಸಾಮಾನ್ಯ",
+                    "icon": "ShieldCheck",
+                },
+                {
+                    "id": 4,
+                    "title": "ಮಣ್ಣಿನ ಆರೈಕೆ ಮತ್ತು ಮೇಲ್ಮೈ ಸಡಿಲಿಕೆ",
+                    "subtitle": "ಗಿಡಗಳ ಬುಡಕ್ಕೆ ಮಣ್ಣು ಏರಿಸಿ ಬೇರುಗಳ ಬೆಳವಣಿಗೆಗೆ ಸಹಕರಿಸಿ.",
+                    "urgency": "ಸಾಮಾನ್ಯ",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 5,
+                    "title": "ರಕ್ಷಣಾತ್ಮಕ ಮೈಕ್ರೋ-ಕ್ಲೈಮೇಟ್ ಸಿಂಪಡಣೆ",
+                    "subtitle": "ತಾಪಮಾನ ಏರಿಕೆಯಿಂದ ತಡೆಯಲು ಸೂಕ್ಷ್ಮ ಪೋಷಕಾಂಶಗಳ ಸಿಂಪಡಣೆ ಮಾಡಿ.",
+                    "urgency": "ಸಾಮಾನ್ಯ",
+                    "icon": "Sun",
+                },
+            ]
+        elif lang == "te":
+            if is_severe:
+                return [
+                    {
+                        "id": 1,
+                        "title": "ML హెచ్చరిక: 24-48 గంటల్లో డ్రిప్ ద్వారా నీరు ఇవ్వండి",
+                        "subtitle": f"రాండమ్ ఫారెస్ట్ మోడల్ తీవ్ర తేమ కొరతను గుర్తించింది (NDWI: {ndwi:.2f}, {temp_c:.1f}°C). పంటను కాపాడటానికి 3 గంటలు నీటిని అందించండి.",
+                        "urgency": "అత్యవసరం",
+                        "icon": "Droplets",
+                    },
+                    {
+                        "id": 2,
+                        "title": f"{crop_u} కి పొటాషియం నైట్రేట్ (13:0:45) పిచికారీ",
+                        "subtitle": "లీటరు నీటికి 10 గ్రాములు కలిపి పిచికారీ చేసి పువ్వులు, పిందెలు రాలకుండా చూడండి.",
+                        "urgency": "అవసరం",
+                        "icon": "Sprout",
+                    },
+                    {
+                        "id": 3,
+                        "title": "తెగుళ్ల పరిశీలన మరియు లింగాకర్షక బుట్టలు",
+                        "subtitle": "ఆకుల అడుగున తెల్లదోమ, పేనుబంక గమనించండి. ఎకరాకు 5 లింగాకర్షక బుట్టలు ఏర్పాటు చేయండి.",
+                        "urgency": "సాధారణం",
+                        "icon": "ShieldCheck",
+                    },
+                    {
+                        "id": 4,
+                        "title": "నేల యాజమాన్యం మరియు కలుపు నివారణ",
+                        "subtitle": "మొక్కల మొదళ్ల వద్ద కలుపు తీసి వేళ్లకు గాలి ఆడేలా దున్నండి.",
+                        "urgency": "సాధారణం",
+                        "icon": "Sprout",
+                    },
+                    {
+                        "id": 5,
+                        "title": "వాతావరణ రక్షణ & వేప నూనె స్ప్రే",
+                        "subtitle": "సాయంత్రం వేళల్లో 1500 PPM వేప నూనె @ 3ml/L పిచికారీ చేయండి.",
+                        "urgency": "సాధారణం",
+                        "icon": "Sun",
+                    },
+                ]
+            return [
+                {
+                    "id": 1,
+                    "title": "క్రమబద్ధమైన డ్రిప్ నీటి యాజమాన్యం",
+                    "subtitle": f"NDVI {ndvi:.2f} ఆరోగ్యకరంగా ఉంది. సాయంత్రం 2 గంటలు నీటిని అందించండి.",
+                    "urgency": "సాధారణం",
+                    "icon": "Droplets",
+                },
+                {
+                    "id": 2,
+                    "title": f"{crop_u} కి 19:19:19 నీటిలో కరిగే ఎరువుల పిచికారీ",
+                    "subtitle": "మొక్కల ఎదుగుదలకు లీటరు నీటికి 5 గ్రాముల చొప్పున స్ప్రే చేయండి.",
+                    "urgency": "సాధారణం",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 3,
+                    "title": "సమగ్ర సస్యరక్షణ (KVK సలహా)",
+                    "subtitle": "పసుపు రంగు జిగురు అట్టలు ఏర్పాటు చేసి తెగుళ్లను గమనించండి.",
+                    "urgency": "సాధారణం",
+                    "icon": "ShieldCheck",
+                },
+                {
+                    "id": 4,
+                    "title": "నేల గుల్ల చేయడం & వేళ్ల పోషణ",
+                    "subtitle": "మొక్కల వరసల మధ్య తేలికపాటి గునపంతో నేలను గుల్ల చేయండి.",
+                    "urgency": "సాధారణం",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 5,
+                    "title": "వాతావరణ రక్షణ చర్యలు",
+                    "subtitle": "ఎండ తీవ్రత తట్టుకోవడానికి మైక్రో-న్యూట్రియంట్ స్ప్రే చేయండి.",
+                    "urgency": "సాధారణం",
+                    "icon": "Sun",
                 },
             ]
 
@@ -423,6 +649,20 @@ INSTRUCTIONS FOR YOUR ANSWER:
                     "urgency": "Routine",
                     "icon": "ShieldCheck",
                 },
+                {
+                    "id": 4,
+                    "title": "Soil Aeration & Inter-Cultivation Weeding",
+                    "subtitle": "Perform shallow hoeing between rows to loosen root-zone soil, boost oxygenation, and accelerate nitrogen uptake.",
+                    "urgency": "Routine",
+                    "icon": "Sprout",
+                },
+                {
+                    "id": 5,
+                    "title": "Weather Stress Shielding & Neem Bio-Spray",
+                    "subtitle": f"Ambient temp is {temp_c:.1f}°C. Apply 1500 PPM Neem Oil @ 3ml/L in evening to shield foliage against heat scald.",
+                    "urgency": "Routine",
+                    "icon": "Sun",
+                },
             ]
 
         return [
@@ -446,6 +686,20 @@ INSTRUCTIONS FOR YOUR ANSWER:
                 "subtitle": "Inspect crop foliage weekly and maintain field sanitation as recommended by KVK.",
                 "urgency": "Routine",
                 "icon": "ShieldCheck",
+            },
+            {
+                "id": 4,
+                "title": "Soil Moisture Conservation & Mulching",
+                "subtitle": "Clear inter-row weeds and spread crop residue mulch to preserve root zone moisture.",
+                "urgency": "Routine",
+                "icon": "Sprout",
+            },
+            {
+                "id": 5,
+                "title": "Protective Micro-Climate Foliar Shield",
+                "subtitle": "Apply 1500 PPM Neem Oil @ 3ml/L in late afternoon to prevent fungal spore germination.",
+                "urgency": "Routine",
+                "icon": "Sun",
             },
         ]
 
