@@ -477,6 +477,15 @@ export default function FarmerDashboard({
   const [aiAnswer, setAiAnswer] = useState(null);
   const [isAskingAi, setIsAskingAi] = useState(false);
 
+  // Available native languages
+  const nativeLanguages = [
+    { code: 'mr', label: 'मराठी', flag: '🇮🇳', region: 'Maharashtra' },
+    { code: 'hi', label: 'हिन्दी', flag: '🇮🇳', region: 'North/Central' },
+    { code: 'en', label: 'English', flag: '🌐', region: 'Global' },
+    { code: 'kn', label: 'ಕನ್ನಡ', flag: '🇮🇳', region: 'Karnataka' },
+    { code: 'te', label: 'తెలుగు', flag: '🇮🇳', region: 'Andhra/Telangana' },
+  ];
+
   // Sync prediction when props update
   useEffect(() => {
     setLocalPrediction(prediction);
