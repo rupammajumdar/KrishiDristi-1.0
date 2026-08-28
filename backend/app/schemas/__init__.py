@@ -212,6 +212,18 @@ class PredictionRequest(BaseModel):
     crop_type: Optional[CropTypeEnum] = Field(None, description="Override or specified crop type")
 
 
+class LocationPredictionRequest(BaseModel):
+    latitude: float = Field(19.8341, description="Latitude of the location")
+    longitude: float = Field(75.8812, description="Longitude of the location")
+    crop_type: Optional[CropTypeEnum] = Field(CropTypeEnum.COTTON, description="Target crop")
+    district: Optional[str] = Field("Jalna", description="District name")
+    state: Optional[str] = Field("Maharashtra", description="State name")
+    village: Optional[str] = Field(None, description="Village or plot identifier")
+    area_ha: Optional[float] = Field(2.0, description="Farm area in hectares")
+    ndvi: Optional[float] = Field(None, description="Optional custom or live NDVI value")
+    ndwi: Optional[float] = Field(None, description="Optional custom or live NDWI value")
+
+
 class PredictionResponse(BaseModel):
     id: int
     aoi_id: int
@@ -225,6 +237,11 @@ class PredictionResponse(BaseModel):
     input_snapshot_json: Dict[str, Any]
     triggered_alert: bool
     created_at: datetime
+    ml_stress_classification: Optional[Dict[str, Any]] = None
+    ml_anomaly: Optional[Dict[str, Any]] = None
+    ml_water_metrics: Optional[Dict[str, Any]] = None
+    ml_models_used: Optional[List[str]] = None
+    location_context: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True
@@ -234,6 +251,7 @@ class PredictionHistoryResponse(BaseModel):
     aoi_id: int
     predictions: List[PredictionResponse]
     total: int
+
 
 
 # ─── Alert Schemas ───────────────────────────────────────────────────────────

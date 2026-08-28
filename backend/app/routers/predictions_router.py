@@ -16,13 +16,61 @@ from app.models import (
     User, AOI, CropType, YieldPrediction, Alert, AlertType, AlertStatus,
     Notification, NotificationChannel, SatellitePass, IndexResult, IndexType,
 )
-from app.schemas import PredictionRequest, PredictionResponse, PredictionHistoryResponse
+from app.schemas import PredictionRequest, LocationPredictionRequest, PredictionResponse, PredictionHistoryResponse
 from app.auth import get_current_user
 from app.services.ml_engine import ml_engine
 from app.services.satellite import satellite_engine
 from app.services.notifications import notification_service
 
 router = APIRouter(prefix="/api/aois", tags=["ML Yield Predictions"])
+
+
+@router.post("/location-predict", response_model=PredictionResponse)
+async def predict_location_ml(
+    req: LocationPredictionRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    On-Demand Location-Based ML Prediction (Smart PS 85 ML Suite).
+    Executes:
+    1. Random Forest Vegetation Stress Classifier (rf_stress.joblib)
+    2. PyTorch LSTM AutoEncoder for Temporal Anomaly Detection (lstm_anomaly_best.pth)
+    3. Regional Agro-Climatic Zone & Soil Calibration
+    4. Live OpenWeather Current & 5-Day Rainfall Telemetry
+    """
+    crop = req.crop_type.value if req.crop_type else "cotton"
+    ndvi = req.ndvi if req.ndvi is not None else 0.48
+    ndwi = req.ndwi if req.ndwi is not None else -0.14
+
+    pred_result = ml_engine.predict_yield(
+        mean_ndvi=ndvi,
+        mean_ndwi=ndwi,
+        crop_type=crop,
+        area_ha=req.area_ha or 2.0,
+        lat=req.latitude,
+        lon=req.longitude,
+        district=req.district or "Jalna",
+        state=req.state or "Maharashtra",
+    )
+
+    return PredictionResponse(
+        id=int(datetime.utcnow().timestamp()),
+        aoi_id=0,
+        model_version=pred_result["model_version"],
+        predicted_yield_kg_ha=pred_result["predicted_yield_kg_ha"],
+        confidence_lower=pred_result["confidence_lower"],
+        confidence_upper=pred_result["confidence_upper"],
+        yield_change_pct=pred_result["yield_change_pct"],
+        crop_type=CropType(crop),
+        feature_importance=pred_result["feature_importance"],
+        input_snapshot_json=pred_result["input_snapshot_json"],
+        triggered_alert=pred_result["triggered_alert"],
+        created_at=datetime.utcnow(),
+        ml_stress_classification=pred_result.get("ml_stress_classification"),
+        ml_anomaly=pred_result.get("ml_anomaly"),
+        ml_models_used=pred_result.get("ml_models_used"),
+        location_context=pred_result.get("location_context"),
+    )
 
 
 async def _get_latest_index_values(
@@ -70,10 +118,10 @@ async def predict_yield(
 ):
     """
     Trigger ML yield prediction for an AOI (F3.1).
-    - Pulls the latest NDVI and NDWI from stored satellite index results.
-    - Fetches real-time temperature and rainfall via OpenWeather API.
+    - Pulls the latest NDVI and NDWI from stored satellite index results or live GEE.
+    - Runs Random Forest stress classifier (rf_stress.joblib) & PyTorch LSTM AutoEncoder (lstm_anomaly_best.pth).
+    - Fetches real-time temperature and rainfall via OpenWeather API for exact coordinates.
     - If yield drop >= 20%, raises an Early Warning Drought Risk Alert (F3.2).
-    - Sends SMS via Twilio if the farmer has opted in and creds are configured.
     """
     res = await db.execute(select(AOI).where(AOI.id == aoi_id))
     aoi = res.scalar_one_or_none()
@@ -109,7 +157,7 @@ async def predict_yield(
         except Exception as e:
             print(f"[Prediction GEE Fetch Exception] {e}")
 
-    # ── Step 2: Get real coordinates from geometry for weather lookup ──────
+    # ── Step 2: Get real coordinates from geometry for weather & agro-zone lookup ──────
     lat, lon = 19.8341, 75.8812  # Jalna defaults
     try:
         from shapely.geometry import shape
@@ -127,7 +175,7 @@ async def predict_yield(
     except Exception as e:
         print(f"[Prediction Centroid Error] {e}")
 
-    # ── Step 3: Run ML inference with live weather ─────────────────────────
+    # ── Step 3: Run ML inference with live models and location context ─────────
     if req and req.crop_type:
         crop = req.crop_type.value
         # Also sync AOI crop_type in DB
@@ -145,7 +193,8 @@ async def predict_yield(
         area_ha=area,
         lat=lat,
         lon=lon,
-        # rainfall_mm and temp_avg_c left as None → fetched live from OpenWeather
+        district=aoi.district or "Jalna",
+        state=aoi.state or "Maharashtra",
     )
 
     # ── Step 4: Persist prediction ─────────────────────────────────────────
@@ -220,7 +269,25 @@ async def predict_yield(
                 db.add(notif)
                 await db.commit()
 
-    return PredictionResponse.model_validate(db_pred)
+    return PredictionResponse(
+        id=db_pred.id,
+        aoi_id=db_pred.aoi_id,
+        model_version=db_pred.model_version,
+        predicted_yield_kg_ha=db_pred.predicted_yield_kg_ha,
+        confidence_lower=db_pred.confidence_lower,
+        confidence_upper=db_pred.confidence_upper,
+        yield_change_pct=db_pred.yield_change_pct,
+        crop_type=db_pred.crop_type,
+        feature_importance=db_pred.feature_importance,
+        input_snapshot_json=db_pred.input_snapshot_json,
+        triggered_alert=db_pred.triggered_alert,
+        created_at=db_pred.created_at,
+        ml_stress_classification=pred_result.get("ml_stress_classification"),
+        ml_anomaly=pred_result.get("ml_anomaly"),
+        ml_models_used=pred_result.get("ml_models_used"),
+        location_context=pred_result.get("location_context"),
+    )
+
 
 
 @router.get("/{aoi_id}/predict/history", response_model=PredictionHistoryResponse)
@@ -253,7 +320,8 @@ async def get_ai_advisory(
 ):
     """
     Generate Google Gemini powered real-time agricultural action tasks
-    using live Sentinel-2 NDVI/NDWI telemetry and OpenWeather data.
+    using live Sentinel-2 NDVI/NDWI telemetry, OpenWeather data, and
+    ML Model inferences (Random Forest, LSTM AutoEncoder, UNet).
     """
     from app.services.gemini_service import gemini_service
     res = await db.execute(select(AOI).where(AOI.id == aoi_id))
@@ -278,6 +346,21 @@ async def get_ai_advisory(
     # Real OpenWeather data
     rain_mm, temp_c = ml_engine.fetch_live_weather(lat, lon)
 
+    crop = (crop_type or (aoi.crop_type.value if aoi.crop_type else "cotton")).lower()
+    area = aoi.area_hectares or 2.5
+
+    # Run ML Model Inference for Real-Time Advisory
+    ml_pred = ml_engine.predict_yield(
+        mean_ndvi=mean_ndvi,
+        mean_ndwi=mean_ndwi,
+        crop_type=crop,
+        area_ha=area,
+        lat=lat,
+        lon=lon,
+        district=aoi.district,
+        state=aoi.state,
+    )
+
     aoi_data = {
         "id": aoi.id,
         "name": aoi.name,
@@ -285,29 +368,111 @@ async def get_ai_advisory(
         "taluk": aoi.taluk or aoi.district or "Jalna",
         "district": aoi.district or "Jalna",
         "state": aoi.state or "Maharashtra",
-        "area_hectares": aoi.area_hectares or 2.5
+        "area_hectares": area,
     }
 
     tasks = await gemini_service.generate_realtime_actionable_tasks(
         aoi_data=aoi_data,
-        crop_type=crop_type,
+        crop_type=crop,
         ndvi=mean_ndvi,
         ndwi=mean_ndwi,
         temp_c=temp_c,
         rain_mm=rain_mm,
-        lang=lang or "en"
+        lang=lang or "en",
+        ml_stress_classification=ml_pred.get("ml_stress_classification"),
+        ml_anomaly=ml_pred.get("ml_anomaly"),
+        yield_change_pct=ml_pred.get("yield_change_pct"),
+        feature_importance=ml_pred.get("feature_importance"),
+        location_context=ml_pred.get("location_context"),
     )
 
     return {
         "aoi_id": aoi_id,
-        "crop_type": crop_type,
+        "crop_type": crop,
         "language": lang,
         "ndvi": mean_ndvi,
         "ndwi": mean_ndwi,
         "temp_c": temp_c,
         "rain_mm": rain_mm,
-        "ai_engine": "Google Gemini 3.1 Flash",
-        "tasks": tasks
+        "ai_engine": "Google Gemini 3.1 Flash + KrishiDrishti ML Engine",
+        "ml_stress_classification": ml_pred.get("ml_stress_classification"),
+        "ml_anomaly": ml_pred.get("ml_anomaly"),
+        "predicted_yield_kg_ha": ml_pred.get("predicted_yield_kg_ha"),
+        "yield_change_pct": ml_pred.get("yield_change_pct"),
+        "tasks": tasks,
+    }
+
+
+@router.post("/location-ai-advisory")
+async def get_location_ai_advisory(
+    req: LocationPredictionRequest,
+    lang: Optional[str] = "en",
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate real-time ML-grounded AI action tasks directly from map coordinates,
+    real-time satellite indices, and live OpenWeather data.
+    """
+    from app.services.gemini_service import gemini_service
+
+    crop = req.crop_type.value if req.crop_type else "cotton"
+    ndvi = req.ndvi if req.ndvi is not None else 0.48
+    ndwi = req.ndwi if req.ndwi is not None else -0.14
+    lat = req.latitude
+    lon = req.longitude
+    area = req.area_ha or 2.0
+
+    # Run ML Model Inference
+    ml_pred = ml_engine.predict_yield(
+        mean_ndvi=ndvi,
+        mean_ndwi=ndwi,
+        crop_type=crop,
+        area_ha=area,
+        lat=lat,
+        lon=lon,
+        district=req.district,
+        state=req.state,
+    )
+
+    rain_mm = ml_pred.get("input_snapshot_json", {}).get("rainfall_mm", 22.0)
+    temp_c = ml_pred.get("input_snapshot_json", {}).get("temperature_c", 31.5)
+
+    aoi_data = {
+        "name": f"Map Point ({lat:.2f}, {lon:.2f})",
+        "village": req.village or "Field",
+        "district": req.district or "Jalna",
+        "state": req.state or "Maharashtra",
+        "area_hectares": area,
+    }
+
+    tasks = await gemini_service.generate_realtime_actionable_tasks(
+        aoi_data=aoi_data,
+        crop_type=crop,
+        ndvi=ndvi,
+        ndwi=ndwi,
+        temp_c=temp_c,
+        rain_mm=rain_mm,
+        lang=lang or "en",
+        ml_stress_classification=ml_pred.get("ml_stress_classification"),
+        ml_anomaly=ml_pred.get("ml_anomaly"),
+        yield_change_pct=ml_pred.get("yield_change_pct"),
+        feature_importance=ml_pred.get("feature_importance"),
+        location_context=ml_pred.get("location_context"),
+    )
+
+    return {
+        "crop_type": crop,
+        "language": lang,
+        "ndvi": ndvi,
+        "ndwi": ndwi,
+        "temp_c": temp_c,
+        "rain_mm": rain_mm,
+        "ai_engine": "Google Gemini 3.1 Flash + KrishiDrishti ML Engine",
+        "ml_stress_classification": ml_pred.get("ml_stress_classification"),
+        "ml_anomaly": ml_pred.get("ml_anomaly"),
+        "predicted_yield_kg_ha": ml_pred.get("predicted_yield_kg_ha"),
+        "yield_change_pct": ml_pred.get("yield_change_pct"),
+        "tasks": tasks,
     }
 
 
@@ -332,7 +497,7 @@ async def ask_ai_assistant(
     if not aoi:
         raise HTTPException(status_code=404, detail="AOI not found")
 
-    mean_ndvi, _ = await _get_latest_index_values(aoi_id, db)
+    mean_ndvi, mean_ndwi = await _get_latest_index_values(aoi_id, db)
 
     lat, lon = 19.8341, 75.8812
     try:
@@ -346,6 +511,17 @@ async def ask_ai_assistant(
         pass
 
     rain_mm, temp_c = ml_engine.fetch_live_weather(lat, lon)
+
+    ml_pred = ml_engine.predict_yield(
+        mean_ndvi=mean_ndvi,
+        mean_ndwi=mean_ndwi,
+        crop_type=crop_type,
+        area_ha=aoi.area_hectares or 2.5,
+        lat=lat,
+        lon=lon,
+        district=aoi.district,
+        state=aoi.state,
+    )
 
     aoi_data = {
         "name": aoi.name,
@@ -361,7 +537,8 @@ async def ask_ai_assistant(
         ndvi=mean_ndvi,
         temp_c=temp_c,
         rain_mm=rain_mm,
-        lang=lang
+        lang=lang,
+        ml_prediction=ml_pred,
     )
 
     return {

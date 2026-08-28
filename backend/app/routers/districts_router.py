@@ -234,6 +234,60 @@ INDIAN_LOCATIONS = [
 ]
 
 
+def _resolve_state_from_coords(lat: float, lon: float) -> str:
+    """Coarse coordinate-box state resolution for India (fallback when geocoding fails)."""
+    boxes = [
+        # (state, (min_lat, max_lat, min_lon, max_lon))
+        ("Punjab",            (29.5, 32.5,  73.8, 76.9)),
+        ("Haryana",           (27.4, 30.9,  74.4, 77.6)),
+        ("Rajasthan",         (23.0, 30.5,  69.4, 78.2)),
+        ("Gujarat",           (20.0, 24.7,  68.1, 74.5)),
+        ("Jammu and Kashmir", (32.0, 36.5,  73.0, 80.0)),
+        ("Himachal Pradesh",  (30.3, 33.3,  75.6, 79.0)),
+        ("Uttarakhand",       (28.7, 31.5,  77.5, 81.0)),
+        ("Uttar Pradesh",     (24.0, 30.5,  77.0, 84.5)),
+        ("Bihar",             (24.2, 27.5,  83.2, 88.3)),
+        ("West Bengal",       (21.4, 27.2,  85.8, 89.8)),
+        ("Jharkhand",         (21.9, 25.4,  83.4, 87.7)),
+        ("Odisha",            (17.7, 22.6,  81.4, 87.5)),
+        ("Chhattisgarh",      (17.5, 24.0,  80.0, 84.5)),
+        ("Madhya Pradesh",    (21.0, 26.9,  74.0, 82.8)),
+        ("Maharashtra",       (15.6, 22.1,  72.6, 80.9)),
+        ("Telangana",         (15.8, 19.9,  77.2, 81.8)),
+        ("Andhra Pradesh",    (12.8, 19.2,  76.8, 84.9)),
+        ("Karnataka",         (11.5, 18.5,  74.0, 78.6)),
+        ("Tamil Nadu",        (8.0, 13.6,  76.0, 80.4)),
+        ("Kerala",            (8.0, 12.8,  74.8, 77.4)),
+        ("Goa",               (14.8, 15.8,  73.6, 74.3)),
+        ("Assam",             (24.2, 28.0,  89.5, 96.0)),
+        ("Meghalaya",         (24.9, 26.2,  89.7, 92.8)),
+        ("Nagaland",          (25.2, 27.0,  93.2, 95.2)),
+        ("Manipur",           (23.8, 25.7,  93.0, 94.6)),
+        ("Mizoram",           (21.9, 24.5,  92.2, 93.5)),
+        ("Tripura",           (22.9, 24.5,  91.1, 92.4)),
+        ("Sikkim",            (27.0, 28.2,  88.0, 88.9)),
+        ("Arunachal Pradesh", (26.5, 29.5,  91.5, 97.5)),
+    ]
+    for state, (min_lat, max_lat, min_lon, max_lon) in boxes:
+        if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
+            return state
+    return "India"
+
+
+_STATE_DEFAULT_DISTRICT = {
+    "Punjab": "Ludhiana", "Haryana": "Karnal", "Rajasthan": "Jaipur",
+    "Gujarat": "Rajkot", "Jammu and Kashmir": "Jammu", "Himachal Pradesh": "Kangra",
+    "Uttarakhand": "Dehradun", "Uttar Pradesh": "Kanpur", "Bihar": "Patna",
+    "West Bengal": "Kolkata", "Jharkhand": "Ranchi", "Odisha": "Bhubaneswar",
+    "Chhattisgarh": "Raipur", "Madhya Pradesh": "Indore", "Maharashtra": "Jalna",
+    "Telangana": "Warangal", "Andhra Pradesh": "Guntur", "Karnataka": "Dharwad",
+    "Tamil Nadu": "Thanjavur", "Kerala": "Thrissur", "Goa": "North Goa",
+    "Assam": "Jorhat", "Meghalaya": "East Khasi Hills", "Nagaland": "Kohima",
+    "Manipur": "Imphal", "Mizoram": "Aizawl", "Tripura": "West Tripura",
+    "Sikkim": "South Sikkim", "Arunachal Pradesh": "Papum Pare",
+}
+
+
 @router.get("/geocode")
 async def geocode_location(q: str):
     """
@@ -324,11 +378,17 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
             if resp.status_code == 200:
                 data = resp.json()
                 addr = data.get("address", {})
+                coords_state = _resolve_state_from_coords(lat, lon)
                 village = (
-                    addr.get("village") or addr.get("suburb") or addr.get("town") or 
-                    addr.get("city_district") or addr.get("city") or addr.get("hamlet") or 
-                    addr.get("road") or f"Plot ({lat:.2f}, {lon:.2f})"
+                    addr.get("village") or addr.get("suburb") or addr.get("town") or
+                    addr.get("city_district") or addr.get("city") or addr.get("hamlet") or
+                    addr.get("road") or addr.get("county")
                 )
+                if not village:
+                    village = (
+                        best_match["name"].split(',')[0].strip()
+                        if best_match else "Field"
+                    )
                 taluk = (
                     addr.get("county") or addr.get("subdistrict") or addr.get("tehsil") or 
                     addr.get("taluk") or village
@@ -337,7 +397,7 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
                     addr.get("state_district") or addr.get("district") or addr.get("county") or 
                     addr.get("city") or taluk
                 )
-                state = addr.get("state") or "Maharashtra"
+                state = addr.get("state") or coords_state
                 return {
                     "name": data.get("display_name", f"Farm Plot ({lat:.3f}, {lon:.3f})"),
                     "village": village,
@@ -357,12 +417,32 @@ async def reverse_geocode_coords(lat: float, lon: float) -> dict:
             "state": best_match.get("state", "Maharashtra")
         }
 
+    coords_state = _resolve_state_from_coords(lat, lon)
+    default_district = _STATE_DEFAULT_DISTRICT.get(coords_state, "Selected District")
+
+    # Nearest dictionary location that shares the resolved state (wider radius)
+    import math
+    near_match = None
+    if coords_state != "India":
+        min_d = 999.0
+        for loc in INDIAN_LOCATIONS:
+            if loc.get("state", "Maharashtra") == coords_state:
+                d = math.hypot(loc["lat"] - lat, loc["lng"] - lon)
+                if d < min_d:
+                    min_d = d
+                    near_match = loc
+    if near_match and min_d < 1.5:
+        default_district = near_match.get("district", default_district)
+        place_hint = near_match["name"].split(',')[0].strip()
+    else:
+        place_hint = default_district
+
     return {
         "name": f"Farm Plot ({lat:.3f}, {lon:.3f})",
-        "village": "Local Field",
-        "taluk": "Local Taluk",
-        "district": "Local District",
-        "state": "Maharashtra"
+        "village": f"Field near {place_hint}",
+        "taluk": default_district,
+        "district": default_district,
+        "state": coords_state
     }
 
 

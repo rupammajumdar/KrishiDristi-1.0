@@ -1,0 +1,45 @@
+============================================================
+  KRIDSHDRISTI — Anomaly Scorecard
+============================================================
+
+Region    : India
+Satellite : sentinel-2
+Period    : 20230115 -> 20231220
+Composites: 16
+
+--- Vegetation Stress Summary ---
+  mean_ndvi: 0.375
+  min_ndvi: 0.143
+  severe_stress_fraction: 0.0
+
+--- Water Body Summary ---
+  mean_extent_ha: 77.53
+  max_extent_ha: 140.32
+  min_extent_ha: 34.28
+
+--- Anomaly Detection ---
+  total_pixels: 65536
+  anomaly_pixels: 135
+  anomaly_fraction: 0.0021
+  mean_score: 0.026
+  max_score: 1.0
+  threshold: 0.7
+
+--- Change Events ---
+  20230115 -> 20230210: net=0.03 ha
+  20230210 -> 20230305: net=-0.03 ha
+  20230305 -> 20230325: net=0.16 ha
+  20230325 -> 20230415: net=-22.45 ha
+  20230415 -> 20230510: net=-7.62 ha
+  20230510 -> 20230605: net=2.85 ha
+  20230605 -> 20230625: net=9.66 ha
+  20230625 -> 20230715: net=63.0 ha
+  20230715 -> 20230810: net=23.95 ha
+  20230810 -> 20230830: net=6.58 ha
+  20230830 -> 20230920: net=-6.8 ha
+  20230920 -> 20231015: net=-22.75 ha
+  20231015 -> 20231110: net=-46.36 ha
+  20231110 -> 20231130: net=1.67 ha
+  20231130 -> 20231220: net=-1.24 ha
+
+============================================================

@@ -488,6 +488,18 @@ class SatelliteEngine:
     # ──────────────────────────────────────────────────────────
     # Public: NDVI Processing
     # ──────────────────────────────────────────────────────────
+    @staticmethod
+    def classify_ndvi(mean_ndvi: float, crop_type: str = "cotton") -> StressClassification:
+        """
+        Classify vegetation health from mean NDVI using calibrated thresholds.
+        Green >= 0.60 (healthy), Yellow 0.30-0.60 (moderate stress), Red < 0.30 (severe stress/bare).
+        """
+        if mean_ndvi >= settings.NDVI_GREEN_THRESHOLD:
+            return StressClassification.GREEN
+        if mean_ndvi >= settings.NDVI_YELLOW_THRESHOLD:
+            return StressClassification.YELLOW
+        return StressClassification.RED
+
     def process_ndvi_raster(
         self,
         cloud_cover_pct: float,

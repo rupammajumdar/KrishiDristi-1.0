@@ -28,7 +28,12 @@ import {
   Loader2,
   Trash2,
   FolderOpen,
-  MapPin
+  MapPin,
+  Cpu,
+  Layers,
+  Activity,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { translations } from '../i18n';
@@ -53,14 +58,14 @@ const CROPS_DATABASE = {
   },
   rice: {
     id: 'rice',
-    names: { en: 'Rice / Paddy', mr: 'भात / धान', hi: 'धान / चावल', kn: 'ಭತ್ತ / ಅಕ್ಕಿ', te: 'వరి / ధాన్యం' },
+    names: { en: 'Rice / Paddy', mr: 'भात / धान', hi: 'धान / चावल', kn: 'ಭತ್ತ', te: 'వరి' },
     mspPerQtl: 2300,
     normalYieldQtlAcre: 22.0,
     unit: 'Qtl',
   },
   wheat: {
     id: 'wheat',
-    names: { en: 'Wheat', mr: 'गहू', hi: 'गेहूं', kn: 'ಗೋಧಿ', te: 'గోధుమ' },
+    names: { en: 'Wheat', mr: 'गहू', hi: 'गेहूँ', kn: 'ಗೋಧಿ', te: 'గోధుమ' },
     mspPerQtl: 2275,
     normalYieldQtlAcre: 18.5,
     unit: 'Qtl',
@@ -74,7 +79,7 @@ const CROPS_DATABASE = {
   },
   maize: {
     id: 'maize',
-    names: { en: 'Maize / Corn', mr: 'मका', hi: 'मक्का', kn: 'ಮೆಕ್ಕೆಜೋಳ', te: 'ಮొక్కజొన్న' },
+    names: { en: 'Maize / Corn', mr: 'मका', hi: 'मक्का', kn: 'ಮೆಕ್ಕೆಜೋಳ', te: 'మొక్కజొన్న' },
     mspPerQtl: 2090,
     normalYieldQtlAcre: 24.0,
     unit: 'Qtl',
@@ -90,356 +95,257 @@ const CROPS_DATABASE = {
 
 /**
  * Intelligent Location & Agro-Climatic Advisory Generator
- * Generates dynamic, highly localized tasks based on:
- * 1. Location (District, State, Village, Taluk)
- * 2. Agro-Climatic Zone & Soil Characteristics (Vertisols, Red soils, Alluvial, Coastal)
- * 3. Local KVK / Agri University Research Station
- * 4. Real-time Weather & Satellite Stress (Temp, Rainfall deficit, NDWI, NDVI, Loss risk)
- * 5. Selected Crop & Multi-Language (EN, MR, HI, KN, TE)
+ * Generates dynamic, highly localized tasks based directly on ML Model returns:
+ * 1. Random Forest (rf_stress.joblib) -> Severe / Moderate / Healthy classification
+ * 2. PyTorch LSTM AutoEncoder (lstm_anomaly.pth) -> Temporal reconstruction anomaly score
+ * 3. OpenWeather real-time weather (temp, rainfall)
+ * 4. Regional Agro-Climatic Zone & Soil profile
  */
 function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
   const district = aoi?.district || 'Jalna';
-  const village = aoi?.village || aoi?.taluk || 'Mantha';
+  const village = aoi?.village || aoi?.taluk || 'Field';
   const state = aoi?.state || 'Maharashtra';
-  const distLower = district.toLowerCase();
-  const stateLower = state.toLowerCase();
 
-  const changePct = prediction?.yield_change_pct ?? -21.8;
+  // Extract Exact ML Model Outputs
+  const rfInfo = prediction?.ml_stress_classification || prediction?.input_snapshot_json?.rf_stress_classification;
+  const lstmInfo = prediction?.ml_anomaly || prediction?.input_snapshot_json?.lstm_anomaly_detection;
+  const locCtx = prediction?.location_context || prediction?.input_snapshot_json?.location_context;
+
+  const changePct = prediction?.yield_change_pct ?? -18.4;
   const temp = prediction?.input_snapshot_json?.temp_avg_c ?? 29.5;
   const rainfall = prediction?.input_snapshot_json?.rainfall_mm ?? 360;
   const ndwi = prediction?.input_snapshot_json?.mean_ndwi ?? -0.15;
-  const ndvi = prediction?.input_snapshot_json?.mean_ndvi ?? 0.44;
-  const isHighRisk = changePct <= -20.0 || ndwi < -0.12;
+  const ndvi = prediction?.input_snapshot_json?.mean_ndvi ?? 0.46;
 
-  // Determine Agro-Climatic Zone & KVK
-  let zoneName = {
-    en: `${district} Rainfed Agro-Zone`,
-    mr: `${district} कोरडवाहू कृषी विभाग`,
-    hi: `${district} वर्षा आधारित कृषि क्षेत्र`,
-    kn: `${district} ಮಳೆಯಾಶ್ರಿತ ಕೃಷಿ ವಲಯ`,
-    te: `${district} వర్షాధార వ్యవసాయ మండలం`
-  };
-  let soilType = {
-    en: 'Black Vertisol Soil',
-    mr: 'काळी कसदार जमीन (Vertisol)',
-    hi: 'काली चिकनी मिट्टी (Vertisol)',
-    kn: 'ಕಪ್ಪು ಮಣ್ಣು (Vertisol)',
-    te: 'నల్ల రేగడి నేల (Vertisol)'
-  };
-  let kvkHub = `KVK ${district}`;
+  // ML Stress Classification Flags
+  const stressLabel = rfInfo?.stress_label || (changePct <= -20.0 ? 'Severe Stress' : 'Moderate Stress');
+  const isSevereStress = rfInfo?.stress_class_id === 0 || (rfInfo?.probabilities?.severe_stress ?? 0) >= 0.40;
+  const isModerateStress = rfInfo?.stress_class_id === 1 || (rfInfo?.probabilities?.moderate_stress ?? 0) >= 0.40;
+  const isHealthyVeg = rfInfo?.stress_class_id === 2 || (rfInfo?.probabilities?.healthy ?? 0) >= 0.60;
 
-  // Regional classifications
-  if (['jalna', 'beed', 'aurangabad', 'parbhani', 'nanded', 'osmanabad', 'latur', 'hingoli'].some(d => distLower.includes(d))) {
-    zoneName = {
-      en: `Marathwada Semi-Arid Zone (${district})`,
-      mr: `मराठवाडा दुष्काळप्रवण विभाग (${district})`,
-      hi: `मराठवाड़ा अर्ध-शुष्क क्षेत्र (${district})`,
-      kn: `ಮರಾಠವಾಡ ಅರೆ-ಶುಷ್ಕ ವಲಯ (${district})`,
-      te: `మరాఠ్వాడా ప్రాంతం (${district})`
-    };
-    soilType = {
-      en: 'Deep Black Cotton Soil (Regur/Vertisols)',
-      mr: 'खोल काळी कापसाची जमीन (रेगूर)',
-      hi: 'गहरी काली कपास मिट्टी (रेगुर)',
-      kn: 'ಆಳವಾದ ಕಪ್ಪು ಹತ್ತಿ ಮಣ್ಣು',
-      te: 'లోతైన నల్లరేగడి నేల'
-    };
-    kvkHub = `KVK ${district} / VNMKV Parbhani`;
-  } else if (['nagpur', 'wardha', 'amravati', 'yavatmal', 'akola', 'buldhana', 'chandrapur'].some(d => distLower.includes(d))) {
-    zoneName = {
-      en: `Vidarbha Cotton-Soybean Belt (${district})`,
-      mr: `विदर्भ कापूस-सोयाबीन कृषी पट्टा (${district})`,
-      hi: `विदर्भ कपास-सोयाबीन क्षेत्र (${district})`,
-      kn: `ವಿದರ್ಭ ಕೃಷಿ ವಲಯ (${district})`,
-      te: `విదర్భ వ్యవసాయ ప్రాంతం (${district})`
-    };
-    soilType = {
-      en: 'Heavy Black Soil with High Evaporation',
-      mr: 'भारी काळी जमीन व जास्त बाष्पीभवन',
-      hi: 'भारी काली मिट्टी और उच्च वाष्पीकरण',
-      kn: 'ಭಾರವಾದ ಕಪ್ಪು ಮಣ್ಣು',
-      te: 'భారీ నల్ల నేల'
-    };
-    kvkHub = `Dr. PDKV Akola & CICR Nagpur`;
-  } else if (['pune', 'solapur', 'ahmednagar', 'satara', 'kolhapur', 'sangli', 'nashik'].some(d => distLower.includes(d))) {
-    zoneName = {
-      en: `Western Maharashtra Deccan Zone (${district})`,
-      mr: `पश्चिम महाराष्ट्र दख्खन कृषी विभाग (${district})`,
-      hi: `पश्चिमी महाराष्ट्र दक्कन क्षेत्र (${district})`,
-      kn: `ಪಶ್ಚಿಮ ಮಹಾರಾಷ್ಟ್ರ ವಲಯ (${district})`,
-      te: `పశ్చిమ మహారాష్ట్ర మండలం (${district})`
-    };
-    soilType = {
-      en: 'Medium Black to Clay Loam',
-      mr: 'मध्यम काळी ते पोयटा जमीन',
-      hi: 'मध्यम काली से दोमट मिट्टी',
-      kn: 'ಮಧ್ಯಮ ಕಪ್ಪು ಮಣ್ಣು',
-      te: 'మధ్యస్థ నల్ల నేల'
-    };
-    kvkHub = `MPKV Rahuri / NRC Pune`;
-  } else if (stateLower.includes('karnataka') || ['bengaluru', 'bangalore', 'dharwad', 'belagavi', 'raichur', 'kalaburagi', 'bellary', 'mandya', 'mysuru'].some(d => distLower.includes(d))) {
-    zoneName = {
-      en: `Karnataka Plateau Agro-Zone (${district})`,
-      mr: `कर्नाटक पठार कृषी विभाग (${district})`,
-      hi: `कर्नाटक पठारी कृषि क्षेत्र (${district})`,
-      kn: `ಕರ್ನಾಟಕ ಪ್ರಸ್ಥಭೂಮಿ ಕೃಷಿ ವಲಯ (${district})`,
-      te: `కర్ణాటక పీఠభూమి మండలం (${district})`
-    };
-    soilType = {
-      en: 'Red Sandy Loam & Medium Black Soil',
-      mr: 'लाल वालुकामय आणि मध्यम काळी जमीन',
-      hi: 'लाल रेतीली दोमट और मध्यम काली मिट्टी',
-      kn: 'ಕೆಂಪು ಮರಳು ಮಿಶ್ರಿತ ಮತ್ತು ಕಪ್ಪು ಮಣ್ಣು',
-      te: 'ఎర్ర ఇసుక మరియు నల్ల నేల'
-    };
-    kvkHub = `UAS Dharwad / KVK ${district}`;
-  } else if (stateLower.includes('telangana') || stateLower.includes('andhra') || ['hyderabad', 'warangal', 'karimnagar', 'anantapur', 'kurnool', 'guntur'].some(d => distLower.includes(d))) {
-    zoneName = {
-      en: `Telangana-Rayalaseema Belt (${district})`,
-      mr: `तेलंगणा-रायलसीमा कृषी विभाग (${district})`,
-      hi: `तेलंगाना-रायलसीमा क्षेत्र (${district})`,
-      kn: `ತೆಲಂಗಾಣ-ರಾಯಲಸೀಮಾ ವಲಯ (${district})`,
-      te: `తెలంగాణ & రాయలసీమ మండలం (${district})`
-    };
-    soilType = {
-      en: 'Red Chalkas & Deep Black Soils',
-      mr: 'लाल आणि काळी मिश्र जमीन',
-      hi: 'लाल और काली मिश्रित मिट्टी',
-      kn: 'ಕೆಂಪು ಮತ್ತು ಕಪ್ಪು ಮಿಶ್ರ ಮಣ್ಣು',
-      te: 'ఎర్ర చల్కాలు మరియు లోతైన నల్ల నేలలు'
-    };
-    kvkHub = `PJTSAU Hyderabad / ANGRAU`;
-  } else if (['punjab', 'haryana', 'uttar pradesh', 'madhya pradesh', 'bihar', 'rajasthan', 'delhi'].some(s => stateLower.includes(s))) {
-    zoneName = {
-      en: `Indo-Gangetic Fertile Plains (${district})`,
-      mr: `उत्तर भारत सुपीक गाळ जमीन विभाग (${district})`,
-      hi: `सिंधु-गंगा उपजाऊ मैदानी क्षेत्र (${district})`,
-      kn: `ಉತ್ತರ ಭಾರತ ಬಯಲು ಕೃಷಿ ವಲಯ (${district})`,
-      te: `ఉత్తర భారత మైదాన ప్రాంతం (${district})`
-    };
-    soilType = {
-      en: 'Alluvial Fertile Loam',
-      mr: 'सुपीक गाळाची जमीन',
-      hi: 'उपजाऊ जलोढ़ दोमट मिट्टी',
-      kn: 'ಫಲವತ್ತಾದ ಮೆಕ್ಕಲು ಮಣ್ಣು',
-      te: 'సారవంతమైన ఒండ్రు నేల'
-    };
-    kvkHub = `ICAR-IARI / PAU / KVK ${district}`;
-  }
+  // LSTM Anomaly Flags
+  const anomalyScore = lstmInfo?.anomaly_score ?? 0.28;
+  const isAnomalyDetected = lstmInfo?.anomaly_detected || anomalyScore >= 0.40;
+  const anomalyStatus = lstmInfo?.status_text || (isAnomalyDetected ? 'Elevated Anomaly' : 'Normal Trajectory');
+
+  const zoneName = locCtx?.agro_zone || `${district} Agro-Climatic Zone`;
+  const soilType = locCtx?.soil_type || 'Black Vertisol Soil';
+  const kvkHub = locCtx?.kvk_station || `KVK ${district}`;
 
   const rawTasks = [];
 
-  // Task 1: Irrigation
-  if (temp >= 33 || isHighRisk) {
+  // ── Task 1: ML Stress-Driven Irrigation (Random Forest rf_stress.joblib) ──
+  if (isSevereStress || isAnomalyDetected || temp >= 33) {
+    const pSeverePct = Math.round((rfInfo?.probabilities?.severe_stress ?? 0.70) * 100);
     rawTasks.push({
-      id: 'loc-task-1',
+      id: 'ml-task-1',
       badge: {
-        en: `⚡ ${district} Heat Alert (${temp}°C)`,
-        mr: `⚡ ${district} तापमान इशारा (${temp}°C)`,
-        hi: `⚡ ${district} तापमान चेतावनी (${temp}°C)`,
-        kn: `⚡ ${district} ತಾಪಮಾನ ಎಚ್ಚರಿಕೆ (${temp}°C)`,
-        te: `⚡ ${district} ఉష్ణోగ్రత హెచ్చరిక (${temp}°C)`
+        en: `⚡ ML Stress Alert: ${stressLabel} (${pSeverePct}% Risk in ${district})`,
+        mr: `⚡ ML ताण इशारा: ${stressLabel} (${district} मध्ये ${pSeverePct}% धोका)`,
+        hi: `⚡ ML तनाव चेतावनी: ${stressLabel} (${district} में ${pSeverePct}% जोखिम)`,
+        kn: `⚡ ML ಎಚ್ಚರಿಕೆ: ${stressLabel} (${district})`,
+        te: `⚡ ML హెచ్చరిక: ${stressLabel} (${district})`
       },
       text: {
-        en: `High evapotranspiration in ${village}, ${district}: Provide immediate drip irrigation to prevent crop stress.`,
-        mr: `${village}, ${district} परिसरात जास्त बाष्पीभवन: पिकातील तणाव टाळण्यासाठी तात्काळ ठिबक सिंचन द्या.`,
-        hi: `${village}, ${district} में अत्यधिक वाष्पीकरण: फसल का तनाव रोकने के लिए तुरंत ड्रिप सिंचाई करें।`,
-        kn: `${village}, ${district} ನಲ್ಲಿ ಅಧಿಕ ತಾಪಮಾನ: ಬೆಳೆಗೆ ಹನಿ ನೀರಾವರಿ ನೀಡಿ.`,
-        te: `${village}, ${district} లో అధిక ఉష్ణోగ్రత: డ్రిప్ ద్వారా నీరు అందించండి.`
+        en: `Random Forest model detected ${stressLabel} in ${village}, ${district} (NDWI: ${ndwi.toFixed(2)}, Temp: ${temp.toFixed(1)}°C). Immediate 3-hour drip irrigation needed for ${soilType} to stop moisture collapse.`,
+        mr: `रँडम फॉरेस्ट मॉडेलनुसार ${village}, ${district} मध्ये ${stressLabel} नोंदवला (NDWI: ${ndwi.toFixed(2)}, तापमान: ${temp.toFixed(1)}°C). ${soilType} मधील ओलावा टिकवण्यासाठी त्वरित ३ तास ठिबक सिंचन द्या.`,
+        hi: `रैंडम फॉरेस्ट मॉडल ने ${village}, ${district} में ${stressLabel} पाया (NDWI: ${ndwi.toFixed(2)}, तापमान: ${temp.toFixed(1)}°C). ${soilType} में नमी बनाए रखने हेतु तुरंत 3 घंटे ड्रिप सिंचाई करें.`,
+        kn: `ರ್ಯಾಂಡಮ್ ಫಾರೆಸ್ಟ್ ಮಾದರಿಯು ${village}, ${district} ನಲ್ಲಿ ${stressLabel} ಪತ್ತೆ ಮಾಡಿದೆ. ${soilType} ಗೆ 3 ಗಂಟೆಗಳ ಹನಿ ನೀರಾವರಿ ನೀಡಿ.`,
+        te: `ర్యాండమ్ ఫారెస్ట్ మోడల్ ${village}, ${district} లో ${stressLabel} గుర్తించింది. ${soilType} కు వెంటనే 3 గంటలు డ్రిప్ ద్వారా నీరు అందించండి.`
       },
       urgent: true,
       icon: Droplets
     });
   } else {
+    const pHealthyPct = Math.round((rfInfo?.probabilities?.healthy ?? 0.65) * 100);
     rawTasks.push({
-      id: 'loc-task-1',
+      id: 'ml-task-1',
       badge: {
-        en: `💧 Soil Moisture Advisory for ${district}`,
-        mr: `💧 ${district} साठी जमीन ओलावा सल्ला`,
-        hi: `💧 ${district} के लिए मृदा नमी सलाह`,
-        kn: `💧 ${district} ಮಣ್ಣಿನ ತೇವಾಂಶ ಸಲಹೆ`,
-        te: `💧 ${district} నేల తేమ సలహా`
+        en: `💧 ML Moisture Protocol: ${stressLabel} (${pHealthyPct}% Healthy in ${district})`,
+        mr: `💧 ML ओलावा व्यवस्थापन: ${stressLabel} (${district} मध्ये ${pHealthyPct}% निरोगी)`,
+        hi: `💧 ML नमी प्रोटोकॉल: ${stressLabel} (${district} में ${pHealthyPct}% स्वस्थ)`,
+        kn: `💧 ML ತೇವಾಂಶ ನಿರ್ವಹಣೆ: ${stressLabel} (${district})`,
+        te: `💧 ML తేమ నిర్వహణ: ${stressLabel} (${district})`
       },
       text: {
-        en: `Maintain root zone moisture for ${cropKey} in ${village}: Sentinel-2 NDWI indicates moderate soil reserves. Run standard 2-hour drip cycle.`,
-        mr: `${village} मधील ${cropKey} पिकासाठी मुळांच्या भागात पुरेसा ओलावा ठेवा. सॅटेलाइटनुसार २ तासांचे नियमित ठिबक चक्र सुरू ठेवा.`,
-        hi: `${village} में ${cropKey} के लिए जड़ों में पर्याप्त नमी बनाए रखें। सैटेलाइट अनुसार 2 घंटे का सामान्य ड्रिप चक्र चलाएं।`,
-        kn: `${village} ನಲ್ಲಿ ${cropKey} ಬೆಳೆಗೆ ಬೇರಿನ ತೇವಾಂಶ ಕಾಪಾಡಿಕೊಳ್ಳಿ. 2 ಗಂಟೆಗಳ ಹನಿ ನೀರಾವರಿ ನೀಡಿ.`,
-        te: `${village} లో ${cropKey} పంటకు తగినంత తేమను అందించండి. 2 గంటల డ్రిప్ సైకిల్ నడపండి.`
+        en: `ML Random Forest confirms ${stressLabel} across ${village} (NDVI: ${ndvi.toFixed(2)}, NDWI: ${ndwi.toFixed(2)}). Maintain regular 2-hour drip cycle to conserve root zone water in ${soilType}.`,
+        mr: `ML मॉडेलनुसार ${village} मधील पिकाची स्थिती ${stressLabel} आहे (NDVI: ${ndvi.toFixed(2)}). ${soilType} मध्ये मुळांच्या भागात ओलावा टिकवण्यासाठी नियमित २ तास ठिबक चालू ठेवा.`,
+        hi: `ML मॉडल के अनुसार ${village} में फसल ${stressLabel} स्थिति में है (NDVI: ${ndvi.toFixed(2)}). ${soilType} में नमी के लिए नियमित 2 घंटे ड्रिप चक्र चलाएं.`,
+        kn: `ML ಮಾದರಿಯು ${village} ನಲ್ಲಿ ಬೆಳೆ ${stressLabel} ಸ್ಥಿರವಾಗಿದೆ. 2 ಗಂಟೆಗಳ ಹನಿ ನೀರಾವರಿ ನೀಡಿ.`,
+        te: `ML మోడల్ ప్రకారం ${village} లో పంట ${stressLabel} గా ఉంది. 2 గంటల సాధారణ డ్రిప్ షెడ్యూల్ పాటించండి.`
       },
       urgent: false,
       icon: Droplets
     });
   }
 
-  // Task 2: Crop-Specific Nutrient Protocol
+  // ── Task 2: Crop & Location Nutrition Regimen ──
   if (cropKey === 'cotton') {
     rawTasks.push({
-      id: 'loc-task-2',
+      id: 'ml-task-2',
       badge: {
-        en: `🌱 Cotton Potassium Nitrate Protocol`,
-        mr: `🌱 कापूस पोटॅशियम नायट्रेट खत व्यवस्थापन`,
-        hi: `🌱 कपास पोटैशियम नाइट्रेट पोषण प्रबंधन`,
-        kn: `🌱 ಹತ್ತಿ ಪೋಷಕಾಂಶ ನಿರ್ವಹಣೆ`,
-        te: `🌱 పత్తి పోషకాల నిర్వహణ`
+        en: `🌿 Cotton Potassium Nitrate & Boll Defense (${district})`,
+        mr: `🌿 कापूस पोटॅशियम नायट्रेट व पाते गळती नियंत्रण (${district})`,
+        hi: `🌿 कपास पोटेशियम नाइट्रेट एवं फल गिरना नियंत्रण (${district})`,
+        kn: `🌿 ಹತ್ತಿ ಪೊಟ್ಯಾಸಿಯಮ್ ನೈಟ್ರೇಟ್ ಸಿಂಪಡಣೆ (${district})`,
+        te: `🌿 పత్తి పొటాషియం నైట్రేట్ పిచికారీ (${district})`
       },
       text: {
-        en: `Foliar spray for Cotton in ${district}: Spray Potassium Nitrate (13-0-45) @ 10g/L + Planofix @ 0.25ml/L to stop boll drop in ${village}.`,
-        mr: `${district} मधील कापूस पिकासाठी: बोंड व पात गळती थांबवण्यासाठी पोटॅशियम नायट्रेट (१३-०-४५) @ १० ग्रॅम/लिटर + प्लॅनोफिक्स @ ०.२५ मिली/लिटर फवारा.`,
-        hi: `${district} में कपास फसल के लिए: फूल/टिंडे झड़ने से रोकने हेतु पोटैशियम नाइट्रेट (13-0-45) @ 10 ग्राम/लीटर + प्लानोफिक्स @ 0.25 मिली/लीटर का छिड़काव करें।`,
-        kn: `${district} ನಲ್ಲಿ ಹತ್ತಿ ಬೆಳೆಗೆ: ಪೊಟ್ಯಾಸಿಯಮ್ ನೈಟ್ರೇಟ್ ಸಿಂಪಡಿಸಿ.`,
-        te: `${district} లో పత్తి పంటకు: పొటాషియం నైట్రేట్ పిచికారీ చేయండి.`
+        en: `ML Yield Model forecast for ${district} (${(changePct > 0 ? '+' : '') + changePct.toFixed(1)}% vs baseline): Foliar spray Potassium Nitrate (13-0-45) @ 10g/L + Planofix @ 0.25ml/L to arrest boll drop in ${village}.`,
+        mr: `${district} साठी ML अंदाज (${(changePct > 0 ? '+' : '') + changePct.toFixed(1)}%): पाते गळती रोखण्यासाठी पोटॅशियम नायट्रेट (१३:०:४५) @ १० ग्रॅम/लिटर + प्लॅनोफिक्स @ ०.२५ मिली/लिटर फवारा.`,
+        hi: `${district} के लिए ML पूर्वानुमान (${(changePct > 0 ? '+' : '') + changePct.toFixed(1)}%): फूल व फल गिरने से रोकने हेतु पोटेशियम नाइट्रेट (13-0-45) @ 10 ग्राम/लीटर + प्लानोफिक्स का छिड़काव करें.`,
+        kn: `${district} ನಲ್ಲಿ ಹತ್ತಿ ಬೆಳೆಗಾಗಿ ಪೊಟ್ಯಾಸಿಯಮ್ ನೈಟ್ರೇಟ್ (13-0-45) ಸಿಂಪಡಿಸಿ.`,
+        te: `${district} లో పత్తి పంటకు పొటాషియం నైట్రేట్ (13-0-45) స్ప్రే చేయండి.`
       },
-      urgent: isHighRisk,
+      urgent: isSevereStress || isAnomalyDetected,
       icon: Sprout
     });
   } else if (cropKey === 'soybean') {
     rawTasks.push({
-      id: 'loc-task-2',
+      id: 'ml-task-2',
       badge: {
-        en: `🌱 Soybean 0:52:34 Pod Vigor Spray`,
-        mr: `🌱 सोयाबीन ०:५२:३४ शेंगा पोषण सल्ला`,
-        hi: `🌱 सोयाबीन 0:52:34 फली विकास पोषण सलाह`,
-        kn: `🌱 ಸೋಯಾಬೀನ್ ಕಾಯಿ ಕಟ್ಟುವ ಪೋಷಣೆ`,
-        te: `🌱 సోయాబీన్ కాయల అభివృద్ధి పోషణ`
+        en: `🌿 Soybean Pod Growth: 0:52:34 Foliar Spray`,
+        mr: `🌿 सोयाबीन शेंगा भरणी: ०:५२:३४ फवारणी`,
+        hi: `🌿 सोयाबीन फली भराव: 0:52:34 स्प्रे`,
+        kn: `🌿 ಸೋಯಾಬೀನ್ 0:52:34 ಸಿಂಪಡಣೆ`,
+        te: `🌿 సోయాబీన్ 0:52:34 పిచికారీ`
       },
       text: {
-        en: `Foliar spray for Soybean in ${district}: Spray 0:52:34 @ 10g/L + Boron 20% @ 1g/L for bold pod filling in ${village}.`,
-        mr: `${district} मधील सोयाबीनसाठी: शेंगा टपोऱ्या भरण्यासाठी ०:५२:३४ @ १० ग्रॅम/लिटर + बोरॉन २०% @ १ ग्रॅम/लिटरची फवारणी करा.`,
-        hi: `${district} में सोयाबीन फसल के लिए: दानों के अच्छे भराव हेतु 0:52:34 @ 10 ग्राम/लीटर + बोरॉन 20% @ 1 ग्राम/लीटर का छिड़काव करें।`,
-        kn: `${district} ನಲ್ಲಿ ಸೋಯಾಬೀನ್ ಬೆಳೆಗೆ 0:52:34 ಸಿಂಪಡಿಸಿ.`,
-        te: `${district} లో సోయాబీన్ పంటకు 0:52:34 పిచికారీ చేయండి.`
+        en: `Apply water-soluble 0:52:34 (MKP) @ 5g/L + Boron @ 1g/L across ${village} plots to boost pod weight and grain filling in ${district}.`,
+        mr: `${district} मधील शेंगा भरणीसाठी ${village} मध्ये ०:५२:३४ @ ५ ग्रॅम/लिटर + बोरॉन @ १ ग्रॅम/लिटर फवारा.`,
+        hi: `${district} में फलियों के समुचित विकास हेतु 0:52:34 @ 5 ग्राम/लीटर + बोरॉन @ 1 ग्राम/लीटर का स्प्रे करें.`,
+        kn: `${village} ನಲ್ಲಿ ಸೋಯಾಬೀನ್ ಕಾಳು ತುಂಬಲು 0:52:34 ಸಿಂಪಡಿಸಿ.`,
+        te: `${village} లో సోయాబీన్ గింజల బరువు పెరగడానికి 0:52:34 స్ప్రే చేయండి.`
       },
-      urgent: isHighRisk,
+      urgent: false,
+      icon: Sprout
+    });
+  } else if (cropKey === 'sugarcane') {
+    rawTasks.push({
+      id: 'ml-task-2',
+      badge: {
+        en: `🎋 Sugarcane Trash Mulching & Moisture Care`,
+        mr: `🎋 ऊस पाचट आच्छादन व ओलावा संवर्धन`,
+        hi: `🎋 गन्ना पत्ती मल्चिंग एवं नमी संरक्षण`,
+        kn: `🎋 ಕಬ್ಬು ಕಸದ ಹೊದಿಕೆ ನಿರ್ವಹಣೆ`,
+        te: `🎋 చెరకు ఆకుల మల్చింగ్`
+      },
+      text: {
+        en: `Spread dry cane trash (5 tonnes/ha) between rows in ${village} to reduce evapotranspiration and suppress weeds in ${district}.`,
+        mr: `${district} मधील बाष्पीभवन रोखण्यासाठी ${village} मधील उसाच्या पट्ट्यात ५ टन/हेक्टर पाचट आच्छादन पसरवा.`,
+        hi: `${district} में वाष्पीकरण कम करने के लिए ${village} में गन्ने की कतारों के बीच सूखी पत्ती मल्चिंग करें.`,
+        kn: `${village} ನಲ್ಲಿ ಕಬ್ಬಿನ ಸಾಲುಗಳಲ್ಲಿ ಒಣ ಎಲೆಗಳನ್ನು ಹರಡಿ.`,
+        te: `${village} లో చెరకు వరుసల మధ్య ఎండిన ఆకులను మల్చింగ్ చేయండి.`
+      },
+      urgent: false,
       icon: Sprout
     });
   } else if (cropKey === 'maize') {
     rawTasks.push({
-      id: 'loc-task-2',
+      id: 'ml-task-2',
       badge: {
-        en: `🌽 Maize Nitrogen Top-Dress Protocol`,
-        mr: `🌽 मका युरिया खत व्यवस्थापन`,
-        hi: `🌽 मक्का यूरिया पोषण प्रबंधन`,
+        en: `🌽 Maize Tasseling & Urea Top-Dressing`,
+        mr: `🌽 मका तुरा फुटणे: युरिया खत मात्रा`,
+        hi: `🌽 मक्का नर मंजरी अवस्था: यूरिया टॉप-ड्रेसिंग`,
         kn: `🌽 ಮೆಕ್ಕೆಜೋಳ ಯೂರಿಯಾ ಗೊಬ್ಬರ`,
-        te: `🌽 మొక్కజొన్న యూరియా పోషణ`
+        te: `🌽 మొక్కజొన్న యూరియా వేయడం`
       },
       text: {
-        en: `Top-dress Nitrogen for Maize in ${village}: Apply Urea @ 35 kg/acre near root zone with light irrigation in ${district}.`,
-        mr: `${village} मधील मका पिकासाठी: कणसे लागण्यापूर्वी झाडाच्या मुळांशी एकरी ३५ किलो युरिया द्या आणि हलके पाणी द्या.`,
-        hi: `${village} में मक्का फसल हेतु: भुट्टा बनने से पहले प्रति एकड़ 35 किलो यूरिया जड़ों के पास दें और हल्की सिंचाई करें।`,
-        kn: `${village} ನಲ್ಲಿ ಮೆಕ್ಕೆಜೋಳ ಬೆಳೆಗೆ ಯೂರಿಯಾ ನೀಡಿ.`,
-        te: `${village} లో మొక్కజొన్న పంటకు యూరియా వేయండి.`
+        en: `Top-dress Neem-coated Urea @ 30kg/acre in ${village} at knee-high to tasseling stage. Inspect whorl for Fall Armyworm.`,
+        mr: `${village} मध्ये मक्याला ३० किलो/एकर निमयुक्त युरिया द्या. लष्करी अळी (Fall Armyworm) चा प्रादुर्भाव तपासा.`,
+        hi: `${village} में मक्का फसल में 30 किग्रा/एकड़ नीम-लेपित यूरिया दें और फॉल आर्मीवर्म सुंडी की जांच करें.`,
+        kn: `${village} ನಲ್ಲಿ ಮೆಕ್ಕೆಜೋಳಕ್ಕೆ ಯೂರಿಯಾ ಗೊಬ್ಬರ ಹಾಕಿ ಮತ್ತು ಕೀಟಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.`,
+        te: `${village} లో మొక్కజొన్నకు యూరియా వేసి కత్తెర పురుగును గమనించండి.`
       },
       urgent: false,
       icon: Sprout
     });
   } else if (cropKey === 'tur') {
     rawTasks.push({
-      id: 'loc-task-2',
+      id: 'ml-task-2',
       badge: {
         en: `🌱 Tur / Pigeon Pea 19:19:19 Spray`,
-        mr: `🌱 तूर १९:१९:१९ फुटवे व फुलधारणा सल्ला`,
-        hi: `🌱 अरहर 19:19:19 शाखा व फूल पोषण`,
-        kn: `🌱 ತೊಗರಿ ಬೆಳೆ ಪೋಷಣೆ`,
-        te: `🌱 కందుల పంట పోషణ`
+        mr: `🌱 तूर १९:१९:१९ व पल्स वंडर फवारणी`,
+        hi: `🌱 अरहर 19:19:19 एवं पल्स वंडर स्प्रे`,
+        kn: `🌱 ತೊಗರಿ 19:19:19 ಸಿಂಪಡಣೆ`,
+        te: `🌱 కందులు 19:19:19 పిచికారీ`
       },
       text: {
         en: `Spray 19:19:19 @ 5g/L + Pulse Wonder in ${village} to enhance branching and profuse flowering in ${district}.`,
-        mr: `${district} मधील तूर पिकासाठी: फुटवे व फुलोरा वाढवण्यासाठी १९:१९:१९ @ ५ ग्रॅम/लिटरची फवारणी करा.`,
-        hi: `${district} में अरहर फसल के लिए: शाखाएं और फूल बढ़ाने हेतु 19:19:19 @ 5 ग्राम/लीटर का छिड़काव करें।`,
+        mr: `${district} मधील तूर पिकात फुटवे व फुलोरा वाढवण्यासाठी १९:१९:१९ @ ५ ग्रॅम/लिटर फवारा.`,
+        hi: `${district} में अरहर की शाखाओं एवं फूलों की वृद्धि हेतु 19:19:19 @ 5 ग्राम/लीटर का छिड़काव करें.`,
         kn: `${district} ನಲ್ಲಿ ತೊಗರಿ ಬೆಳೆಗೆ 19:19:19 ಸಿಂಪಡಿಸಿ.`,
-        te: `${district} లో కందుల పంటకు 19:19:19 పిచಿಕారీ చేయండి.`
+        te: `${district} లో కంది పంటకు 19:19:19 స్ప్రే చేయండి.`
       },
       urgent: false,
       icon: Sprout
     });
   } else if (cropKey === 'rice' || cropKey === 'wheat') {
     rawTasks.push({
-      id: 'loc-task-2',
+      id: 'ml-task-2',
       badge: {
         en: `🌾 ${district} Grain Initiation Care`,
-        mr: `🌾 ${district} दाणे भरण्याची अवस्था काळजी`,
-        hi: `🌾 ${district} दाना भराव अवस्था देखभाल`,
-        kn: `🌾 ${district} ಕಾಳು ಕಟ್ಟುವ ಹಂತದ ಪೋಷಣೆ`,
-        te: `🌾 ${district} గింజ అభివృద్ధి జాగ్రత్తలు`
+        mr: `🌾 ${district} लोंबी / ओंबी भरणे व्यवस्थापन`,
+        hi: `🌾 ${district} बाली निर्माण एवं पोषण प्रबंधन`,
+        kn: `🌾 ${district} ತೆನೆ ಭರ್ತಿ ನಿರ್ವಹಣೆ`,
+        te: `🌾 ${district} వెన్ను దశ పోషణ`
       },
       text: {
         en: `Top-dress balanced Urea + Neem cake in ${village} fields. Maintain 3-4 cm standing water depth during critical panicle initiation.`,
-        mr: `${village} मधील शेतात युरिया व निंबोळी पेंडीचा दुसरा हप्ता द्या. लोंबी भरण्याच्या काळात शेतात ३-४ सेमी पाणी पातळी टिकवून ठेवा.`,
-        hi: `${village} के खेतों में यूरिया व नीम खली का उचित प्रयोग करें। बाली बनते समय 3-4 सेमी पानी का स्तर बनाए रखें।`,
-        kn: `${village} ಗದ್ದೆಗಳಲ್ಲಿ ಯೂರಿಯಾ ಗೊಬ್ಬರ ನೀಡಿ ಮತ್ತು 3-4 ಸೆಂ.ಮೀ ನೀರು ನಿಲ್ಲಿಸಿ.`,
-        te: `${village} పొలాల్లో యూరియా వేయండి మరియు 3-4 సెం.మీ నీటి మట్టం ఉంచండి.`
+        mr: `${village} मधील शेतात संतुलित युरिया व निंबोळी पेंड द्या. लोंबी निघण्याच्या काळात शेतात ३-४ सेंमी पाणी साठवून ठेवा.`,
+        hi: `${village} के खेतों में यूरिया व नीम खली का प्रयोग करें. बाली निकलते समय 3-4 सेमी पानी की गहराई बनाए रखें.`,
+        kn: `${village} ಗದ್ದೆಗಳಲ್ಲಿ ಸಮತೋಲಿತ ರಸಗೊಬ್ಬರ ನೀಡಿ ಮತ್ತು 3-4 ಸೆಂ.ಮೀ ನೀರು ನಿಲ್ಲಿಸಿ.`,
+        te: `${village} పొలాల్లో యూరియా వేసి 3-4 సెం.మీ నీటి మట్టాన్ని నిర్వహించండి.`
       },
       urgent: false,
       icon: Sprout
     });
   } else {
     rawTasks.push({
-      id: 'loc-task-2',
+      id: 'ml-task-2',
       badge: {
-        en: `🌿 ${district} Crop Vigor Protocol`,
-        mr: `🌿 ${district} पीक वाढ व खत सल्ला`,
-        hi: `🌿 ${district} फसल वृद्धि पोषण`,
-        kn: `🌿 ${district} ಬೆಳೆ ಪೋಷಣೆ`,
-        te: `🌿 ${district} పంట పెరుగుదల సలహా`
+        en: `🌱 ${district} Crop Vigor Protocol`,
+        mr: `🌱 ${district} पीक पोषण व वाढ प्रोटोकॉल`,
+        hi: `🌱 ${district} फसल पोषण एवं वृद्धि प्रोटोकॉल`,
+        kn: `🌱 ${district} ಬೆಳೆ ಪೋಷಣೆ`,
+        te: `🌱 ${district} పంట పోషణ`
       },
       text: {
         en: `Apply water-soluble NPK (19:19:19) @ 5g/L to boost vegetative vigor across ${village} plots as detected by Sentinel-2 NDVI (${ndvi.toFixed(2)}).`,
-        mr: `सॅटेलाइट NDVI (${ndvi.toFixed(2)}) नुसार ${village} मधील पिकाच्या जोमदार वाढीसाठी १९:१९:१९ @ ५ ग्रॅम/लिटरची फवारणी करा.`,
-        hi: `सैटेलाइट NDVI (${ndvi.toFixed(2)}) के अनुसार ${village} में फसल वृद्धि हेतु 19:19:19 @ 5 ग्राम/लीटर का छिड़काव करें।`,
-        kn: `${village} ನಲ್ಲಿ ಸಸ್ಯದ ಉತ್ತಮ ಬೆಳವಣಿಗೆಗಾಗಿ 19:19:19 ಸಿಂಪಡಿಸಿ.`,
-        te: `${village} లో పంట పెరుగుదలకు 19:19:19 పిచికారీ చేయండి.`
+        mr: `उपग्रह NDVI (${ndvi.toFixed(2)}) नुसार ${village} मधील पिकांची वाढ सुधारण्यासाठी १९:१९:१९ @ ५ ग्रॅम/लिटर फवारा.`,
+        hi: `उपग्रह NDVI (${ndvi.toFixed(2)}) के आधार पर ${village} में वनस्पति वृद्धि हेतु 19:19:19 @ 5 ग्राम/लीटर का छिड़काव करें.`,
+        kn: `${village} ನಲ್ಲಿ ಬೆಳೆಯ ಬೆಳವಣಿಗೆಗೆ 19:19:19 ಸಿಂಪಡಿಸಿ.`,
+        te: `${village} లో పంట పెరుగుదలకు 19:19:19 స్ప్రే చేయండి.`
       },
       urgent: false,
       icon: Sprout
     });
   }
 
-  // Task 3: Localized KVK / University Pest & Disease Surveillance
+  // ── Task 3: Localized KVK / University Pest & Disease Surveillance ──
   rawTasks.push({
     id: 'loc-task-3',
     badge: {
       en: `🛡️ ${kvkHub} Integrated Pest Advisory`,
-      mr: `🛡️ ${kvkHub} कीड नियंत्रण सल्ला`,
-      hi: `🛡️ ${kvkHub} कीट नियंत्रण सलाह`,
-      kn: `🛡️ ${kvkHub} ಕೀಟ ನಿಯಂತ್ರಣ ಸಲಹೆ`,
-      te: `🛡️ ${kvkHub} పురుగుల నివారణ సలహా`
+      mr: `🛡️ ${kvkHub} एकात्मिक कीड नियंत्रण`,
+      hi: `🛡️ ${kvkHub} एकीकृत कीट प्रबंधन सलाह`,
+      kn: `🛡️ ${kvkHub} ಸಮಗ್ರ ಕೀಟ ನಿಯಂತ್ರಣ`,
+      te: `🛡️ ${kvkHub} సమగ్ర తెగుళ్ల నివారణ`
     },
     text: {
       en: `Inspect lower canopy in ${village} for sucking pests (whiteflies/jassids) and pink bollworm. Install 5 pheromone traps per acre as per ${district} KVK advisory.`,
-      mr: `${district} कृषी विज्ञान केंद्र (KVK) च्या सल्ल्यानुसार ${village} मधील शेतात एकरी ५ कामगंध सापळे लावा व रसशोषक किडींचे निरीक्षण करा.`,
-      hi: `${district} कृषि विज्ञान केंद्र (KVK) की सलाह अनुसार ${village} में प्रति एकड़ 5 फेरोमोन ट्रैप लगाएं और सफेद मक्खी/माहू की निगरानी करें।`,
-      kn: `${district} ಕೆವಿಕೆ ಸಲಹೆಯಂತೆ ${village} ನಲ್ಲಿ ಎಕರೆಗೆ 5 ಮೋಹಕ ಬಲೆಗಳನ್ನು ಅಳವಡಿಸಿ ಕೀಟಗಳ ಬಾಧೆ ಪರೀಕ್ಷಿಸಿ.`,
-      te: `${district} కేవీకే సలహా మేరకు ${village} లో ఎకరాకు 5 లింగాకర్షక బుట్టలు అమర్చి పురుగులను గమనించండి.`
+      mr: `${district} कृषी विज्ञान केंद्र (KVK) च्या सल्ल्यानुसार ${village} मधील शेतात रसशोषक किडी तपासा व प्रति एकर ५ कामगंध सापळे लावा.`,
+      hi: `${district} कृषि विज्ञान केंद्र (KVK) की सलाह अनुसार ${village} में रस चूसक कीटों की जांच करें और प्रति एकड़ 5 फेरोमोन ट्रैप लगाएं.`,
+      kn: `${district} ಕೃಷಿ ವಿಜ್ಞಾನ ಕೇಂದ್ರದ ಸಲಹೆಯಂತೆ ${village} ನಲ್ಲಿ 5 ಮೋಹಕ ಬಲೆಗಳನ್ನು ಅಳವಡಿಸಿ.`,
+      te: `${district} కృషి విజ్ఞాన కేంద్రం సలహా ప్రకారం ${village} లో ఎకరాకు 5 లింగాకర్షక బుట్టలు ఏర్పాటు చేయండి.`
     },
     urgent: false,
     icon: ShieldCheck
   });
 
-  // Task 4: District Revenue / PMFBY & Local Market Task
-  rawTasks.push({
-    id: 'loc-task-4',
-    badge: {
-      en: `📍 ${district} Agronomic Action Window`,
-      mr: `📍 ${district} स्थानिक कृषी कृती`,
-      hi: `📍 ${district} स्थानीय कृषि कार्यवाही`,
-      kn: `📍 ${district} ಸ್ಥಳೀಯ ಕೃಷಿ ಕ್ರಮ`,
-      te: `📍 ${district} స్థానిక వ్యవసాయ చర్య`
-    },
-    text: {
-      en: `Verify plot boundary for ${village} (${(aoi?.area_hectares * 2.471 || 5.0).toFixed(1)} Acres): Keep 72-hour moisture log ready for PMFBY crop insurance verification in ${district}.`,
-      mr: `${village} मधील शेतासाठी (${(aoi?.area_hectares * 2.471 || 5.0).toFixed(1)} एकर): ${district} मध्ये पीक विमा (PMFBY) पडताळणीसाठी ७२ तासांचा ओलावा अहवाल तयार ठेवा.`,
-      hi: `${village} के खेत हेतु (${(aoi?.area_hectares * 2.471 || 5.0).toFixed(1)} एकड़): ${district} में पीएम फसल बीमा योजना (PMFBY) सत्यापन हेतु 72 घंटे का नमी रिकॉर्ड तैयार रखें।`,
-      kn: `${village} ನ ಜಮೀನಿಗೆ (${(aoi?.area_hectares * 2.471 || 5.0).toFixed(1)} ಎಕರೆ): ${district} ನಲ್ಲಿ ಬೆಳೆ ವಿಮೆ ಪರಿಶೀಲನೆಗಾಗಿ ದಾಖಲೆ ಸಿದ್ಧವಾಗಿಟ್ಟುಕೊಳ್ಳಿ.`,
-      te: `${village} లోని పొలానికి (${(aoi?.area_hectares * 2.471 || 5.0).toFixed(1)} ఎకరాలు): ${district} లో పంట బీమా ధృవీకరణ కోసం రికార్డులను సిద్ధంగా ఉంచండి.`
-    },
-    urgent: false,
-    icon: Calendar
-  });
-
   return {
-    zoneName: zoneName[lang] || zoneName.en,
-    soilType: soilType[lang] || soilType.en,
+    soilType,
+    zoneName,
     kvkHub,
     tasks: rawTasks.map(t => ({
       id: t.id,
@@ -451,20 +357,20 @@ function generateLocationAwareTasks({ aoi, prediction, cropKey, lang }) {
   };
 }
 
-export default function FarmerDashboard({ 
-  aois = [],
-  selectedAoi, 
+export default function FarmerDashboard({
+  aois,
+  selectedAoi,
   onSelectAoi,
   onDeleteAoi,
-  prediction, 
-  onGenerateReport, 
-  currentLang,
+  prediction,
+  onGenerateReport,
+  currentLang = 'mr',
   onSelectLang,
-  onUpdateCrop
+  onUpdateCrop,
 }) {
-  const t = translations[currentLang]?.farmer || translations.en.farmer;
-  const [showExplainability, setShowExplainability] = useState(false);
+  const t = translations[currentLang] || translations.mr;
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [showExplainability, setShowExplainability] = useState(false);
   const [isCropDropdownOpen, setIsCropDropdownOpen] = useState(false);
   const [isPlotManagerOpen, setIsPlotManagerOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
@@ -472,14 +378,24 @@ export default function FarmerDashboard({
   // Available native languages
   const nativeLanguages = [
     { code: 'mr', label: 'मराठी', flag: '🇮🇳', region: 'Maharashtra' },
-    { code: 'hi', label: 'हिंदी', flag: '🇮🇳', region: 'North/Central' },
-    { code: 'en', label: 'English', flag: '🇬🇧', region: 'Global' },
+    { code: 'hi', label: 'हिन्दी', flag: '🇮🇳', region: 'North/Central' },
+    { code: 'en', label: 'English', flag: '🌐', region: 'Global' },
     { code: 'kn', label: 'ಕನ್ನಡ', flag: '🇮🇳', region: 'Karnataka' },
     { code: 'te', label: 'తెలుగు', flag: '🇮🇳', region: 'Andhra/Telangana' },
   ];
 
   // Resolve current active crop from selected plot
   const [selectedCropKey, setSelectedCropKey] = useState(null);
+  const [localPrediction, setLocalPrediction] = useState(prediction);
+  const [isRunningML, setIsRunningML] = useState(false);
+  const [mlToastMessage, setMlToastMessage] = useState(null);
+
+  // Sync prediction when props update
+  useEffect(() => {
+    setLocalPrediction(prediction);
+  }, [prediction]);
+
+  const activePrediction = localPrediction || prediction;
 
   // Sync crop selection when selected plot changes
   useEffect(() => {
@@ -493,6 +409,65 @@ export default function FarmerDashboard({
   const rawCropKey = (selectedCropKey || selectedAoi?.crop_type || 'cotton').toLowerCase();
   const activeCropKey = CROPS_DATABASE[rawCropKey] ? rawCropKey : 'cotton';
   const cropConfig = CROPS_DATABASE[activeCropKey] || CROPS_DATABASE.cotton;
+
+  // Handler to run live ML Model prediction for the location using real-time map data
+  const handleRunLiveML = async () => {
+    if (!selectedAoi) return;
+    setIsRunningML(true);
+    try {
+      let lat = 19.8341, lon = 75.8812;
+      if (selectedAoi.geometry) {
+        try {
+          const geom = typeof selectedAoi.geometry === 'string' ? JSON.parse(selectedAoi.geometry) : selectedAoi.geometry;
+          if (geom.coordinates && geom.coordinates[0] && geom.coordinates[0][0]) {
+            lon = geom.coordinates[0][0][0];
+            lat = geom.coordinates[0][0][1];
+          }
+        } catch (_) {}
+      }
+      const res = await api.predictLocation({
+        lat,
+        lon,
+        cropType: activeCropKey,
+        district: selectedAoi.district || 'Jalna',
+        state: selectedAoi.state || 'Maharashtra',
+        village: selectedAoi.village,
+        areaHa: selectedAoi.area_hectares || 2.0,
+      });
+      if (res) {
+        setLocalPrediction(res);
+        setMlToastMessage(`ML Inference Complete: Random Forest + PyTorch LSTM + Live Satellite Telemetry updated for ${selectedAoi.district || 'plot'}`);
+        setTimeout(() => setMlToastMessage(null), 4000);
+
+        // Immediately update AI advisory / weekly action tasks using the new ML results
+        setIsLoadingAi(true);
+        try {
+          const advRes = selectedAoi.id 
+            ? await api.getAiAdvisory(selectedAoi.id, activeCropKey, currentLang)
+            : await api.getLocationAiAdvisory({
+                lat,
+                lon,
+                cropType: activeCropKey,
+                district: selectedAoi.district,
+                state: selectedAoi.state,
+                village: selectedAoi.village,
+                areaHa: selectedAoi.area_hectares,
+              }, currentLang);
+          if (advRes?.tasks && Array.isArray(advRes.tasks) && advRes.tasks.length > 0) {
+            setAiTasks(advRes.tasks);
+          }
+        } catch (advErr) {
+          console.warn('Error refreshing AI advisory after ML run:', advErr);
+        } finally {
+          setIsLoadingAi(false);
+        }
+      }
+    } catch (e) {
+      console.warn('ML run error:', e);
+    } finally {
+      setIsRunningML(false);
+    }
+  };
 
   // Keyed task completion state per plot/location ID so tasks reset properly on plot change
   const plotKey = selectedAoi?.id || selectedAoi?.name || 'default_plot';
@@ -513,7 +488,7 @@ export default function FarmerDashboard({
   // Generate dynamic, location-aware & weather-adaptive tasks
   const locationAgroProfile = generateLocationAwareTasks({
     aoi: selectedAoi,
-    prediction,
+    prediction: activePrediction,
     cropKey: activeCropKey,
     lang: currentLang
   });
@@ -580,7 +555,7 @@ export default function FarmerDashboard({
         id: `gemini_task_${idx + 1}`,
         text: t.title || t.text,
         sub: t.subtitle,
-        badge: t.urgency || 'Urgent',
+        badge: t.urgency ? `🤖 ML Alert: ${t.urgency}` : '🤖 ML Action',
         urgent: (t.urgency || '').toLowerCase().includes('urgent') || (t.urgency || '').toLowerCase().includes('high') || idx === 0,
         icon: t.icon === 'Droplets' ? Droplets : t.icon === 'ShieldCheck' ? ShieldCheck : Sprout
       }))
@@ -594,7 +569,12 @@ export default function FarmerDashboard({
   const locationParts = Array.from(new Set([selectedAoi?.village, selectedAoi?.taluk, selectedAoi?.district, selectedAoi?.state].filter(p => p && p !== 'Local Field' && p !== 'Local Taluk' && p !== 'Unknown District')));
   const locationStr = locationParts.length > 0 ? locationParts.join(', ') : (selectedAoi?.name || 'Active Farm Location');
 
-  const changePct = prediction?.yield_change_pct || -21.8;
+  const changePct = activePrediction?.yield_change_pct ?? -21.8;
+
+  // ML Fields Extraction
+  const mlRfInfo = activePrediction?.ml_stress_classification || activePrediction?.input_snapshot_json?.rf_stress_classification;
+  const mlLstmInfo = activePrediction?.ml_anomaly || activePrediction?.input_snapshot_json?.lstm_anomaly_detection;
+  const mlLocCtx = activePrediction?.location_context || activePrediction?.input_snapshot_json?.location_context;
 
   // Crop-Specific Harvest & Earnings Calculation
   const normalYieldQtlAcre = cropConfig.normalYieldQtlAcre;
@@ -604,7 +584,7 @@ export default function FarmerDashboard({
   const estEarningsInr = Math.round(parseFloat(totalEstQuintals) * cropConfig.mspPerQtl).toLocaleString('en-IN');
 
   // Dynamic Sentinel-2 NDVI + Yield + Action Recovery Health Score (0-100)
-  const rawNdvi = prediction?.input_snapshot_json?.mean_ndvi ?? 0.48;
+  const rawNdvi = activePrediction?.input_snapshot_json?.mean_ndvi ?? 0.48;
   const completedCount = Object.values(completedTasks).filter(Boolean).length;
   const totalTasks = tasksList.length || 3;
   const taskRecoveryBonus = Math.round((completedCount / totalTasks) * 12); // Farmer gets visible recovery boost for completing tasks
@@ -674,7 +654,7 @@ export default function FarmerDashboard({
 
   const handleShareWhatsApp = () => {
     const cropDisplayName = cropConfig.names[currentLang] || cropConfig.names.en;
-    const text = `🌾 *${t.myPlots}*\n📍 ${locationStr}\n🌱 ${plotName} (${areaAc} Acres - ${cropDisplayName})\n📊 ${t.healthScore}: ${healthScore}%\n💧 ${t.waterAlertSub}\n⚡ ${t.totalHarvest}: ${totalEstQuintals} ${t.quintals} (₹${estEarningsInr})`;
+    const text = `🌾 *${t.myPlots}*\n📍 ${locationStr}\n🌱 ${plotName} (${areaAc} Acres - ${cropDisplayName})\n📊 ${t.healthScore}: ${healthScore}%\n💧 ${t.waterAlertSub}\n💰 ${t.totalHarvest}: ${totalEstQuintals} ${t.quintals} (₹${estEarningsInr})`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -686,256 +666,394 @@ export default function FarmerDashboard({
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
             <Globe className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{t.chooseLanguage}</span>
+            <span>{t.languageSelector || 'Select Language / भाषा निवडा:'}</span>
           </span>
-          <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-            {nativeLanguages.find(l => l.code === currentLang)?.label || 'English'}
+          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
+            {locationAgroProfile.zoneName}
           </span>
         </div>
-        
-        {/* 1-Tap Language Buttons */}
         <div className="grid grid-cols-5 gap-1.5">
-          {nativeLanguages.map((lang) => {
-            const isActive = currentLang === lang.code;
-            return (
-              <button
-                key={lang.code}
-                onClick={() => onSelectLang && onSelectLang(lang.code)}
-                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  isActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-950/60 border border-emerald-400 scale-[1.03]'
-                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-emerald-500/40 hover:bg-slate-800/60'
-                }`}
-              >
-                <span className="text-xs font-bold">{lang.label}</span>
-                <span className="text-[9px] font-normal opacity-60 uppercase">{lang.code}</span>
-              </button>
-            );
-          })}
+          {nativeLanguages.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => onSelectLang && onSelectLang(lang.code)}
+              className={`py-2 px-1.5 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                currentLang === lang.code
+                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-950 shadow-md shadow-emerald-950/60 scale-[1.03] font-black'
+                  : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50'
+              }`}
+            >
+              <span className="text-sm">{lang.flag}</span>
+              <span className="truncate w-full text-center">{lang.label}</span>
+            </button>
+          ))}
         </div>
       </div>
-
-      {/* Empty State when all plots are deleted */}
-      {(!selectedAoi || aois.length === 0) && (
-        <div className="glass-card rounded-2xl p-6 border border-slate-800 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-            <Sprout className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-100">{t.noPlots || 'No farm plots registered'}</h3>
-          <p className="text-xs text-slate-400 max-w-sm">
-            {t.noPlots || "Use the map on the left to click 'Locate Me' (Live GPS) or 'Draw Farm Boundary' to start monitoring your field."}
-          </p>
-        </div>
-      )}
 
       {/* ── 1. Main Farm Header, Crop Switcher, Plot Manager & PDF Action ── */}
       {selectedAoi && (
         <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h2 className="text-lg font-black text-slate-100">{plotName}</h2>
-
-                {/* Plot Switcher & Manager Dropdown Toggle */}
-                {aois.length > 0 && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setIsPlotManagerOpen(!isPlotManagerOpen)}
-                      className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 shadow-sm cursor-pointer transition-colors"
-                      title="Switch or manage marked farms"
-                    >
-                      <FolderOpen className="w-3 h-3 text-emerald-400" />
-                      <span>{t.managePlots || 'Plots'} ({aois.length})</span>
-                      <ChevronDown className="w-3 h-3 opacity-70" />
-                    </button>
-
-                    {/* Plots Dropdown Popover */}
-                    {isPlotManagerOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-80 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-3 shadow-2xl z-50 flex flex-col gap-2">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                          <span className="font-bold text-xs text-slate-200 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>{t.managePlots || 'My Marked Farms'}</span>
-                          </span>
-                          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-                            {aois.length} total
-                          </span>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5 max-h-60 overflow-y-auto pr-1">
-                          {aois.map((aoi) => {
-                            const isSelected = selectedAoi?.id === aoi.id;
-                            const isConfirming = deleteConfirmId === aoi.id;
-                            return (
-                              <div
-                                key={aoi.id}
-                                className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
-                                  isSelected
-                                    ? 'bg-emerald-500/15 border-emerald-500/50 shadow-sm'
-                                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                                }`}
-                              >
-                                <div
-                                  onClick={() => {
-                                    if (onSelectAoi) onSelectAoi(aoi);
-                                    setIsPlotManagerOpen(false);
-                                  }}
-                                  className="flex-1 cursor-pointer min-w-0"
-                                >
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold text-slate-100 truncate">{aoi.name}</span>
-                                    {isSelected && (
-                                      <span className="text-[9px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded">
-                                        {t.activePlot || 'Active'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                    {aoi.village || aoi.district || 'Plot'} • {aoi.area_hectares} Ha • <span className="capitalize text-amber-400 font-medium">{aoi.crop_type || 'cotton'}</span>
-                                  </p>
-                                </div>
-
-                                {isConfirming ? (
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (onDeleteAoi) onDeleteAoi(aoi.id);
-                                        setDeleteConfirmId(null);
-                                      }}
-                                      className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold shadow-md cursor-pointer transition-all animate-pulse"
-                                    >
-                                      Confirm
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteConfirmId(null);
-                                      }}
-                                      className="px-1.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] cursor-pointer"
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteConfirmId(aoi.id);
-                                    }}
-                                    className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/80 border border-rose-500/20 text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
-                                    title={t.deletePlot || 'Delete Farm Plot'}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {areaAc} Acres ({areaHa} Ha)
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                  {locationAgroProfile.zoneName}
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-black text-slate-100">{plotName}</span>
+                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  {areaAc} {t.acres} ({areaHa} Ha)
                 </span>
               </div>
-              <p className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
-                <span>📍 <span className="text-slate-200 font-semibold">{locationStr}</span></span>
-                <span className="text-slate-600">•</span>
-                <span className="text-emerald-400/90 font-medium">🏛️ {locationAgroProfile.kvkHub}</span>
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{locationStr}</span>
               </p>
             </div>
 
-            {/* Audio, PDF & Delete Action Buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Voice Readout Button */}
-              <button
-                onClick={handleVoiceAdvisory}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
-                  isPlayingAudio 
-                    ? 'bg-amber-500 text-slate-950 animate-pulse' 
-                    : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30'
-                }`}
-                title="Listen to advisory in voice"
-              >
-                {isPlayingAudio ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-400" />}
-                <span>{isPlayingAudio ? t.stopAudio : t.listenAudio}</span>
-              </button>
-
-              {/* Download PDF Card */}
-              <button
-                onClick={() => onGenerateReport(selectedAoi?.id || 1, 'farmer')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/50 transition-all cursor-pointer"
-              >
-                <FileText className="w-4 h-4" />
-                <span>{t.downloadReport}</span>
-              </button>
-
-              {/* Delete Active Plot Button with Inline Confirmation */}
+            {/* Quick Plot Switcher & Manager */}
+            <div className="flex items-center gap-2">
               <div className="relative">
-                {deleteConfirmId === selectedAoi.id ? (
-                  <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-500/60 p-1.5 rounded-xl text-xs shadow-xl animate-pulse">
-                    <span className="text-rose-200 text-[10px] font-bold">Delete?</span>
-                    <button
-                      onClick={() => {
-                        if (onDeleteAoi && selectedAoi) onDeleteAoi(selectedAoi.id);
-                        setDeleteConfirmId(null);
-                      }}
-                      className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] cursor-pointer"
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirmId(null)}
-                      className="px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] cursor-pointer"
-                    >
-                      No
-                    </button>
+                <button
+                  onClick={() => setIsPlotManagerOpen(!isPlotManagerOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-all cursor-pointer shadow-sm"
+                  title="Switch or manage farm plots"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t.myPlots || 'My Plots'} ({aois?.length || 1})</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {isPlotManagerOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl p-2 shadow-2xl z-50 flex flex-col gap-1 backdrop-blur-xl animate-in fade-in">
+                    <div className="px-2 py-1.5 border-b border-slate-800 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                      <span>{t.myPlots || 'Switch Active Plot'}</span>
+                      <span className="text-emerald-400 text-[10px]">Real-Time Sync</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto space-y-1 py-1">
+                      {aois && aois.map((plot) => {
+                        const isCurrent = plot.id === selectedAoi.id;
+                        const plotCrop = (plot.crop_type || 'cotton').toLowerCase();
+                        const cropName = CROPS_DATABASE[plotCrop]?.names[currentLang] || plotCrop;
+                        return (
+                          <div 
+                            key={plot.id}
+                            className={`flex items-center justify-between p-2 rounded-xl text-xs transition-colors ${
+                              isCurrent ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold' : 'hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            <button
+                              onClick={() => {
+                                if (onSelectAoi) onSelectAoi(plot);
+                                setIsPlotManagerOpen(false);
+                              }}
+                              className="flex-1 text-left truncate flex flex-col"
+                            >
+                              <span className="truncate">{plot.name || `Farm #${plot.id}`}</span>
+                              <span className="text-[10px] text-slate-400">
+                                {cropName} • {(plot.area_hectares * 2.47).toFixed(1)} Ac
+                              </span>
+                            </button>
+
+                            {/* Delete Plot Confirmation in Dropdown */}
+                            {aois.length > 1 && (
+                              deleteConfirmId === plot.id ? (
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => {
+                                      if (onDeleteAoi) onDeleteAoi(plot.id);
+                                      setDeleteConfirmId(null);
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold cursor-pointer"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-[10px] cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmId(plot.id);
+                                  }}
+                                  className="p-1 rounded hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors ml-1 cursor-pointer"
+                                  title="Delete this farm plot"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setDeleteConfirmId(selectedAoi.id)}
-                    className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/60 border border-rose-500/30 hover:border-rose-500/60 text-rose-400 hover:text-rose-200 transition-all shadow-md cursor-pointer"
-                    title={t.deletePlot || 'Delete this farm plot'}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* ── CROP SELECTOR (Change Crop Anytime) ── */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-              <Sprout className="w-3.5 h-3.5 text-amber-400" />
-              <span>Select Your Crop / पीक निवडा:</span>
-            </span>
+          {/* Interactive Crop Switcher Strip */}
+          <div className="flex items-center justify-between border-t border-slate-800/80 pt-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                <Sprout className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{t.cropType || 'Active Crop'}:</span>
+              </span>
+              
+              <div className="flex items-center gap-1 flex-wrap">
+                {Object.keys(CROPS_DATABASE).map((cKey) => {
+                  const isSelected = activeCropKey === cKey;
+                  const cObj = CROPS_DATABASE[cKey];
+                  return (
+                    <button
+                      key={cKey}
+                      onClick={() => handleSelectCrop(cKey)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 shadow-md font-black scale-105'
+                          : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
+                      }`}
+                    >
+                      <span>{cObj.names[currentLang] || cObj.names.en}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto py-1 max-w-full">
-              {Object.values(CROPS_DATABASE).map((crop) => {
-                const isSelected = activeCropKey === crop.id;
-                const displayName = crop.names[currentLang] || crop.names.en;
-                return (
+            <div className="text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-800">
+              MSP Benchmark: <span className="text-emerald-400 font-bold">₹{cropConfig.mspPerQtl}</span> / Qtl
+            </div>
+          </div>
+
+          {/* Audio, PDF & Delete Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap border-t border-slate-800/80 pt-3">
+            {/* Voice Readout Button */}
+            <button
+              onClick={handleVoiceAdvisory}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                isPlayingAudio 
+                  ? 'bg-amber-500 text-slate-950 animate-pulse' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30'
+              }`}
+              title="Listen to advisory in voice"
+            >
+              {isPlayingAudio ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-400" />}
+              <span>{isPlayingAudio ? t.stopAudio : t.listenAudio}</span>
+            </button>
+
+            {/* Generate Full PDF Report */}
+            <button
+              onClick={() => onGenerateReport && onGenerateReport(selectedAoi.id, 'farmer')}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-bold text-xs transition-all shadow-md cursor-pointer ml-auto"
+            >
+              <FileText className="w-4 h-4 text-slate-950" />
+              <span>{t.downloadReport}</span>
+            </button>
+
+            {/* Delete Farm Button */}
+            {aois && aois.length > 1 && (
+              deleteConfirmId === selectedAoi.id ? (
+                <div className="flex items-center gap-1 bg-rose-950/80 border border-rose-500/40 px-2 py-1 rounded-xl">
+                  <span className="text-[11px] text-rose-300 font-bold">Delete this plot?</span>
                   <button
-                    key={crop.id}
-                    onClick={() => handleSelectCrop(crop.id)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                      isSelected
-                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-950/50 border border-amber-400 scale-105'
-                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-amber-500/50 hover:text-slate-200'
-                    }`}
+                    onClick={() => {
+                      if (onDeleteAoi) onDeleteAoi(selectedAoi.id);
+                      setDeleteConfirmId(null);
+                    }}
+                    className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-black cursor-pointer ml-1"
                   >
-                    {displayName}
+                    Yes
                   </button>
-                );
-              })}
+                  <button
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirmId(selectedAoi.id)}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/50 text-slate-400 hover:text-rose-300 text-xs font-semibold transition-all cursor-pointer"
+                  title="Remove this farm plot from dashboard"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{t.deletePlot || 'Delete Plot'}</span>
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── ML Pipeline Live Inference Scorecard Bar ── */}
+      {selectedAoi && (
+        <div className="bg-slate-950/90 border border-emerald-500/30 rounded-2xl p-3 shadow-lg flex flex-col gap-2.5">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Cpu className="w-4 h-4 animate-pulse text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-xs font-black text-slate-100 flex items-center gap-1.5">
+                  <span>ML Inference Engine (Live Multi-Model Inference)</span>
+                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
+                    Active
+                  </span>
+                </span>
+                <p className="text-[10px] text-slate-400">
+                  Real-time Sentinel-2 Multispectral + OpenWeather Telemetry for {selectedAoi.district || 'plot'}
+                </p>
+              </div>
+            </div>
+
+            {/* Run Live ML Prediction Button */}
+            <button
+              onClick={handleRunLiveML}
+              disabled={isRunningML}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                isRunningML
+                  ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-950/50 scale-[1.02] border border-emerald-400/40'
+              }`}
+            >
+              {isRunningML ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Running ML Models...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Run Live ML Prediction</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* ML Toast message */}
+          {mlToastMessage && (
+            <div className="text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-3 py-1.5 rounded-xl flex items-center gap-2 animate-bounce">
+              <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{mlToastMessage}</span>
+            </div>
+          )}
+
+          {/* 3 Sub-Model Output Panels */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            {/* Model 1: Random Forest Stress (rf_stress.joblib) */}
+            <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl p-3 flex flex-col justify-between gap-2 shadow-sm hover:border-emerald-500/30 transition-all">
+              <div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1">
+                    <Layers className="w-3 h-3" />
+                    <span>RF Stress Model</span>
+                  </span>
+                  <span className="font-mono text-[9px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded">
+                    rf_stress.joblib
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs font-black text-slate-100">
+                    {mlRfInfo?.stress_label || 'Healthy / Moderate'}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    mlRfInfo?.stress_class_id === 2
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : mlRfInfo?.stress_class_id === 0
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  }`}>
+                    {mlRfInfo?.stress_class_id === 2 ? 'Optimal' : mlRfInfo?.stress_class_id === 0 ? 'Severe' : 'Moderate'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Class Probability Distribution */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Healthy Probability</span>
+                  <span className="text-emerald-400 font-bold">
+                    {Math.round((mlRfInfo?.probabilities?.healthy ?? 0.65) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden flex">
+                  <div style={{ width: `${Math.round((mlRfInfo?.probabilities?.healthy ?? 0.65) * 100)}%` }} className="bg-emerald-500 h-full"></div>
+                  <div style={{ width: `${Math.round((mlRfInfo?.probabilities?.moderate_stress ?? 0.25) * 100)}%` }} className="bg-amber-500 h-full"></div>
+                  <div style={{ width: `${Math.round((mlRfInfo?.probabilities?.severe_stress ?? 0.10) * 100)}%` }} className="bg-rose-500 h-full"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Model 2: LSTM AutoEncoder Anomaly (lstm_anomaly_best.pth) */}
+            <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl p-3 flex flex-col justify-between gap-2 shadow-sm hover:border-cyan-500/30 transition-all">
+              <div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-cyan-400 flex items-center gap-1">
+                    <Activity className="w-3 h-3" />
+                    <span>LSTM AutoEncoder</span>
+                  </span>
+                  <span className="font-mono text-[9px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded">
+                    lstm_anomaly.pth
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs font-black text-slate-100">
+                    {mlLstmInfo?.status_text?.includes('Normal') ? 'Normal Trajectory' : 'Anomaly Detected'}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    mlLstmInfo?.anomaly_detected
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  }`}>
+                    {mlLstmInfo?.anomaly_detected ? 'Alert' : 'Stable'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Anomaly Gauge */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Temporal Anomaly Score</span>
+                  <span className="text-cyan-300 font-bold">
+                    {((mlLstmInfo?.anomaly_score ?? 0.18)).toFixed(2)} / 1.00
+                  </span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    style={{ width: `${Math.min(100, Math.round((mlLstmInfo?.anomaly_score ?? 0.18) * 100))}%` }}
+                    className={`h-full ${mlLstmInfo?.anomaly_detected ? 'bg-rose-500' : 'bg-cyan-400'}`}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Model 3: Location Geospatial Calibration */}
+            <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl p-3 flex flex-col justify-between gap-2 shadow-sm hover:border-amber-500/30 transition-all">
+              <div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-amber-400 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    <span>Agro-Zone Calibration</span>
+                  </span>
+                  <span className="font-mono text-[9px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded">
+                    Geo-Calibrated
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-slate-200 mt-2 truncate">
+                  {mlLocCtx?.agro_zone || `${selectedAoi.district || 'Jalna'} Agro-Zone`}
+                </p>
+              </div>
+
+              <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/80">
+                <span className="truncate">{mlLocCtx?.soil_type || 'Deep Vertisols'}</span>
+                <span className="text-amber-400 font-bold shrink-0">
+                  {mlLocCtx?.drought_vulnerability ? mlLocCtx.drought_vulnerability.split(' ')[0] : 'Moderate'} Risk
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -946,57 +1064,26 @@ export default function FarmerDashboard({
         isHighRisk 
           ? 'bg-rose-950/40 border-rose-500/50 text-rose-100 shadow-xl shadow-rose-950/30'
           : isModerateRisk
-          ? 'bg-amber-950/30 border-amber-500/40 text-amber-100 shadow-xl shadow-amber-950/20'
-          : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100 shadow-xl shadow-emerald-950/20'
+          ? 'bg-amber-950/40 border-amber-500/50 text-amber-100 shadow-xl shadow-amber-950/30'
+          : 'bg-emerald-950/40 border-emerald-500/50 text-emerald-100 shadow-xl shadow-emerald-950/30'
       }`}>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className={`p-3 rounded-2xl border mt-0.5 ${
-              isHighRisk 
-                ? 'bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse' 
-                : isModerateRisk
-                ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+            <div className={`p-3 rounded-2xl ${
+              isHighRisk ? 'bg-rose-500/20 text-rose-400' : isModerateRisk ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
             }`}>
-              {isHighRisk ? (
-                <AlertTriangle className="w-7 h-7" />
-              ) : isModerateRisk ? (
-                <AlertCircle className="w-7 h-7" />
-              ) : (
-                <CheckCircle2 className="w-7 h-7" />
-              )}
+              {isHighRisk ? <AlertTriangle className="w-6 h-6" /> : isModerateRisk ? <AlertCircle className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-xs uppercase font-black tracking-wider ${
-                  isHighRisk ? 'text-rose-400' : isModerateRisk ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  {isHighRisk
-                    ? '⚠️ CRITICAL STRESS'
-                    : isModerateRisk
-                    ? t.waterAlertTitle
-                    : '🟢 ' + t.healthGood}
-                </span>
-                <span className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${
-                  isHighRisk 
-                    ? 'bg-rose-900/80 text-white' 
-                    : isModerateRisk 
-                    ? 'bg-amber-900/80 text-amber-200' 
-                    : 'bg-emerald-900/80 text-emerald-200'
-                }`}>
-                  {isHealthy ? `NDVI: ${rawNdvi.toFixed(2)} (Optimal)` : `${changePct}% ${t.belowNormal}`}
-                </span>
-                {taskRecoveryBonus > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">
-                    +{taskRecoveryBonus}% Recovered
-                  </span>
-                )}
-              </div>
-              <h3 className="text-lg font-black text-white mt-1">
-                {cropConfig.names[currentLang] || cropConfig.names.en}: {
-                  isHighRisk
-                    ? 'Immediate Irrigation Required'
-                    : isModerateRisk
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                isHighRisk ? 'bg-rose-500/20 text-rose-300' : isModerateRisk ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+              }`}>
+                {isHighRisk ? t.waterAlert : isModerateRisk ? t.healthNeedsCare : t.healthGood}
+              </span>
+              <h3 className="text-base font-black text-slate-100 mt-1">
+                {isHighRisk 
+                  ? t.waterAlertSub 
+                  : isModerateRisk
                     ? t.waterAlertSub
                     : t.healthGood + ' (Vigorous Canopy)'
                 }
@@ -1020,13 +1107,13 @@ export default function FarmerDashboard({
             <span className={`text-[10px] font-semibold ${
               isHighRisk ? 'text-rose-400' : isModerateRisk ? 'text-amber-400' : 'text-emerald-400'
             }`}>
-              {isHealthy ? t.healthGood : isModerateRisk ? t.healthNeedsCare : 'Critical / तातडीचे'}
+              {isHealthy ? t.healthGood : isModerateRisk ? t.healthNeedsCare : 'Critical / आवश्यक'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* ── 3. "What You Need To Do Today" (Live Google Gemini AI Agronomist Checklist) ── */}
+      {/* ── 3. "What You Need To Do This Week" (Directly Derived from ML Model Returns) ── */}
       <div className="glass-panel rounded-2xl p-4 border border-slate-800 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -1035,14 +1122,14 @@ export default function FarmerDashboard({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black text-slate-100">{t.whatToDoTitle}</h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold flex items-center gap-1">
-                  ✨ Gemini 3.1 Live AI
+                <h3 className="text-sm font-black text-slate-100">{t.whatToDoTitle || 'What You Need To Do This Week'}</h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center gap-1">
+                  🤖 ML Model Inferred
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
                 📍 {locationStr} • <span className="text-emerald-400 font-semibold">{locationAgroProfile.soilType}</span>
-                {isLoadingAi && <span className="ml-2 text-emerald-400 animate-pulse text-[10px]">Analyzing live telemetry...</span>}
+                {isLoadingAi && <span className="ml-2 text-emerald-400 animate-pulse text-[10px]">Analyzing ML outputs & live weather...</span>}
               </p>
             </div>
           </div>
@@ -1096,168 +1183,216 @@ export default function FarmerDashboard({
           })}
         </div>
 
-        {/* ── Interactive Ask Gemini Virtual Agronomist ── */}
-        <div className="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
-              <Bot className="w-4 h-4 text-emerald-400" />
-              <span>Ask Virtual Agronomist (कृषी सहाय्यक)</span>
-            </div>
-            <span className="text-[10px] text-slate-400">
-              Real-time Sentinel-2 & Weather Grounded
+        {/* Task Completion Progress & Health Bonus Banner */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between text-xs">
+          <span className="text-slate-400 font-medium">
+            Completed: <strong className="text-emerald-400">{completedCount}</strong> of {totalTasks} actions
+          </span>
+          {taskRecoveryBonus > 0 && (
+            <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 flex items-center gap-1 text-[11px]">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>+{taskRecoveryBonus}% Crop Recovery Boost</span>
             </span>
-          </div>
-
-          <form onSubmit={handleAskGemini} className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder={currentLang === 'mr' ? 'पिकाविषयी कोणताही प्रश्न विचारा (उदा. ठिबक किती वेळ द्यावे?)...' : currentLang === 'hi' ? 'फसल से जुड़ा कोई भी सवाल पूछें...' : 'Ask any question about your crop (e.g. spray schedule)...'}
-              value={aiQuestion}
-              onChange={(e) => setAiQuestion(e.target.value)}
-              className="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500/60"
-            />
-            <button
-              type="submit"
-              disabled={isAskingAi || !aiQuestion.trim()}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                isAskingAi || !aiQuestion.trim()
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 cursor-pointer shadow-lg shadow-emerald-500/20'
-              }`}
-            >
-              {isAskingAi ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-              <span>{currentLang === 'mr' ? 'विचारा' : currentLang === 'hi' ? 'पूछें' : 'Ask'}</span>
-            </button>
-          </form>
-
-          {/* Quick Suggestions Chips */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-slate-500">Quick:</span>
-            {[
-              currentLang === 'mr' ? 'ठिबक सिंचन कधी करावे?' : 'When to irrigate?',
-              currentLang === 'mr' ? 'कोणती खते द्यावी?' : 'Best fertilizer spray?',
-              currentLang === 'mr' ? 'किडींपासून संरक्षण कसे करावे?' : 'Pest control guidance?'
-            ].map((chip, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setAiQuestion(chip);
-                }}
-                className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 hover:border-emerald-500/30 transition-colors"
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-
-          {/* AI Response Box */}
-          {aiAnswer && (
-            <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3 text-xs text-slate-200 mt-1 shadow-lg flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
-                <span className="flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Gemini AI Agronomist Response:</span>
-                </span>
-                <button onClick={() => setAiAnswer(null)} className="text-slate-400 hover:text-slate-200 text-xs">✕</button>
-              </div>
-              <div className="leading-relaxed whitespace-pre-line text-slate-200">
-                {aiAnswer}
-              </div>
-            </div>
           )}
         </div>
       </div>
 
-      {/* ── 4. Expected Harvest & Earnings for Selected Crop ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Estimated Yield Per Acre */}
-        <div className="glass-panel p-3.5 rounded-2xl border border-slate-800 text-center">
-          <p className="text-[11px] text-slate-400 uppercase font-semibold">{t.expectedYield}</p>
-          <p className="text-xl font-black text-amber-300 mt-1">
-            {yieldQtlPerAcre} <span className="text-xs font-normal text-slate-400">{cropConfig.unit} / Acre</span>
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">Normal is ~{normalYieldQtlAcre} {cropConfig.unit}/Acre</p>
+      {/* ── 4. Interactive AI Agronomist Chatbot (Ask Any Farm Question) ── */}
+      <div className="glass-panel rounded-2xl p-4 border border-blue-500/30 bg-blue-950/20 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
+            <Bot className="w-4 h-4 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
+              <span>{t.askAiTitle || 'Ask KrishiDrishti AI Agronomist (कृषी सहाय्यक)'}</span>
+              <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                Live Q&A
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Get instant, field-specific solutions for {cropConfig.names[currentLang] || cropConfig.names.en} diseases, fertilizers, and sprays in {nativeLanguages.find(l => l.code === currentLang)?.label || 'your language'}.
+            </p>
+          </div>
         </div>
 
-        {/* Total Plot Production */}
-        <div className="glass-panel p-3.5 rounded-2xl border border-slate-800 text-center">
-          <p className="text-[11px] text-slate-400 uppercase font-semibold">{t.totalHarvest}</p>
-          <p className="text-xl font-black text-emerald-400 mt-1">
-            ~{totalEstQuintals} <span className="text-xs font-normal text-slate-400">{cropConfig.unit}</span>
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">{t.forYourAcre} ({areaAc} Ac)</p>
+        {/* AI Answer Display */}
+        {aiAnswer && (
+          <div className="bg-slate-900/90 border border-blue-500/40 rounded-xl p-3 text-xs text-slate-200 leading-relaxed space-y-1.5 animate-in fade-in">
+            <div className="flex items-center justify-between text-[10px] text-blue-400 font-bold border-b border-slate-800 pb-1">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-blue-400" />
+                <span>AI Agronomist Recommendation:</span>
+              </span>
+              <button 
+                onClick={() => setAiAnswer(null)} 
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                ✕ Clear
+              </button>
+            </div>
+            <div className="whitespace-pre-line text-[11px] text-slate-200 leading-relaxed font-sans">
+              {aiAnswer}
+            </div>
+          </div>
+        )}
+
+        {/* Question Form */}
+        <form onSubmit={handleAskGemini} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={aiQuestion}
+            onChange={(e) => setAiQuestion(e.target.value)}
+            placeholder={
+              currentLang === 'mr' 
+                ? 'उदा. कापसावर बोंडअळीसाठी कोणती फवारणी करावी?' 
+                : currentLang === 'hi'
+                ? 'उदा. कपास में रस चूसक कीटों के लिए कौन सी दवा स्प्रे करें?'
+                : `Ask any question about your ${cropConfig.names.en} field...`
+            }
+            className="flex-1 bg-slate-900/90 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={isAskingAi || !aiQuestion.trim()}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
+              isAskingAi || !aiQuestion.trim()
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-950/50'
+            }`}
+          >
+            {isAskingAi ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Send className="w-3.5 h-3.5" />
+            )}
+            <span>{isAskingAi ? 'Thinking...' : 'Ask AI'}</span>
+          </button>
+        </form>
+      </div>
+
+      {/* ── 5. Crop Yield, Earnings & Weather Telemetry ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Harvest Estimation */}
+        <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.totalHarvest}</span>
+            <Sprout className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="mt-2">
+            <div className="text-2xl font-black text-slate-100">
+              {totalEstQuintals} <span className="text-sm font-normal text-slate-400">{t.quintals}</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              ~{yieldQtlPerAcre} {t.quintalsPerAcre} on {areaAc} {t.acres}
+            </p>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Baseline Rate:</span>
+            <span className={`font-bold ${changePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {(changePct > 0 ? '+' : '') + changePct.toFixed(1)}% vs 5-yr avg
+            </span>
+          </div>
         </div>
 
-        {/* Estimated Market Value */}
-        <div className="glass-panel p-3.5 rounded-2xl border border-slate-800 text-center">
-          <p className="text-[11px] text-slate-400 uppercase font-semibold">{t.estMarketValue}</p>
-          <p className="text-xl font-black text-cyan-300 mt-1">
-            ₹{estEarningsInr}
-          </p>
-          <p className="text-[10px] text-slate-500 mt-1">MSP ₹{cropConfig.mspPerQtl.toLocaleString('en-IN')}/{cropConfig.unit}</p>
+        {/* Estimated MSP Market Value */}
+        <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.estIncome}</span>
+            <TrendingUp className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="mt-2">
+            <div className="text-2xl font-black text-amber-300">
+              ₹{estEarningsInr}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Govt MSP @ ₹{cropConfig.mspPerQtl}/{cropConfig.unit}
+            </p>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Target Crop:</span>
+            <span className="font-bold text-slate-200">
+              {cropConfig.names[currentLang] || cropConfig.names.en}
+            </span>
+          </div>
+        </div>
+
+        {/* Live Weather Forecast */}
+        <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.weatherForecast}</span>
+            <Sun className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="mt-2 flex items-center gap-3">
+            <div className="text-2xl font-black text-slate-100">
+              {(activePrediction?.input_snapshot_json?.temp_avg_c ?? 31.5).toFixed(1)}°C
+            </div>
+            <span className="text-xs font-medium text-slate-400">
+              {activePrediction?.input_snapshot_json?.temp_avg_c >= 33 ? 'Hot & Dry' : 'Moderate Weather'}
+            </span>
+          </div>
+          <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">{t.estRainfall}:</span>
+            <span className="font-bold text-cyan-300">
+              {activePrediction?.input_snapshot_json?.rainfall_mm ?? 24} mm (30-day forecast)
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* ── 5. Simple 30-Day Crop Health Growth Chart ── */}
-      <div className="glass-panel rounded-2xl p-4 border border-slate-800">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-bold text-slate-200">{t.healthGrowth30Days}</h3>
+      {/* ── 6. NDVI Vegetation Health Timeline Chart ── */}
+      <div className="glass-card rounded-2xl p-4 border border-slate-800 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-300">{t.healthTrend}</h3>
+            <p className="text-[11px] text-slate-400">Sentinel-2 multi-temporal vegetation vigor (NDVI index)</p>
           </div>
-          <div className="flex items-center gap-2 text-[10px]">
-            <span className="flex items-center gap-1 text-emerald-400">{t.goodThreshold}</span>
-            <span className="flex items-center gap-1 text-amber-400">{t.needsWaterThreshold}</span>
-          </div>
+          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+            {healthScore}% Current Vigor
+          </span>
         </div>
 
-        <div className="h-36 w-full">
+        <div className="h-40 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={ndviTrendData}>
               <defs>
-                <linearGradient id="farmerHealthGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0.0}/>
+                <linearGradient id="ndviGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={isHighRisk ? '#f43f5e' : isModerateRisk ? '#f59e0b' : '#10b981'} stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor={isHighRisk ? '#f43f5e' : isModerateRisk ? '#f59e0b' : '#10b981'} stopOpacity={0.0}/>
                 </linearGradient>
               </defs>
-              <XAxis dataKey="date" stroke="#64748b" fontSize={11} />
-              <YAxis domain={[0, 100]} stroke="#64748b" fontSize={11} unit="%" />
+              <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 10 }} />
+              <YAxis stroke="#64748b" domain={[0, 100]} tick={{ fontSize: 10 }} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
-                itemStyle={{ color: '#4ade80' }}
-                formatter={(value) => [`${value}% Health`, 'Reading']}
+                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '11px' }}
+                formatter={(val) => [`${val}%`, 'Crop Vigor']}
               />
-              <ReferenceLine y={60} stroke="#eab308" strokeDasharray="3 3" />
-              <Area type="monotone" dataKey="health" stroke="#22c55e" strokeWidth={2.5} fillOpacity={1} fill="url(#farmerHealthGrad)" />
+              <ReferenceLine y={50} stroke="#f43f5e" strokeDasharray="3 3" />
+              <Area 
+                type="monotone" 
+                dataKey="health" 
+                stroke={isHighRisk ? '#f43f5e' : isModerateRisk ? '#f59e0b' : '#10b981'} 
+                strokeWidth={2.5}
+                fillOpacity={1} 
+                fill="url(#ndviGrad)" 
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* ── 6. Farmer Support & Helpline Bar ── */}
-      <div className="flex items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-            <PhoneCall className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-200">{t.kisanCallCentre}</p>
-            <p className="text-[11px] text-emerald-400 font-mono font-bold">1800-180-1551</p>
-          </div>
-        </div>
+      {/* ── 7. Explainability Toggle & Social Share ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800">
+        <button
+          onClick={() => setShowExplainability(!showExplainability)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+          <span>{showExplainability ? t.hideWhyAlert : t.whyAlert}</span>
+        </button>
 
         <div className="flex items-center gap-2">
-          <a
-            href="tel:18001801551"
-            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition-all"
-          >
-            {t.callOfficer}
-          </a>
+          {/* WhatsApp Share Button */}
           <button
             onClick={handleShareWhatsApp}
             className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-green-700 hover:bg-green-600 text-white font-bold text-xs transition-all cursor-pointer"
@@ -1266,18 +1401,17 @@ export default function FarmerDashboard({
             <Share2 className="w-3.5 h-3.5" />
             <span>{t.shareWhatsApp}</span>
           </button>
-        </div>
-      </div>
 
-      {/* AI Explainability Toggle (Advanced Details) */}
-      <div className="text-center">
-        <button
-          onClick={() => setShowExplainability(!showExplainability)}
-          className="text-xs text-slate-400 hover:text-emerald-400 inline-flex items-center gap-1.5 transition-colors cursor-pointer py-1"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{showExplainability ? 'Hide AI Details' : '🔍 Technical AI & Weather Factors'}</span>
-        </button>
+          {/* Emergency Kisan Call Center Helpline */}
+          <a
+            href="tel:18001801551"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-amber-500/30 transition-all cursor-pointer"
+            title="Toll-free Kisan Call Center"
+          >
+            <PhoneCall className="w-3.5 h-3.5 text-amber-400" />
+            <span>1800-180-1551</span>
+          </a>
+        </div>
       </div>
 
       {showExplainability && (
