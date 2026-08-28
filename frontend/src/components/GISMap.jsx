@@ -752,11 +752,15 @@ export default function GISMap({
               // Determine color based on active layer & crop health
               let color = '#22c55e'; // Green default
               let fillColor = '#22c55e';
-              if (activeLayer === 'NDVI') {
+              const isLake = aoi.aoi_type === 'lake' || (aoi.name && (aoi.name.toLowerCase().includes('lake') || aoi.name.toLowerCase().includes('reservoir') || aoi.name.toLowerCase().includes('talaab')));
+              if (isLake) {
+                color = '#0284c7'; // Deep Sky Blue for Water Body
+                fillColor = '#0284c7';
+              } else if (activeLayer === 'NDVI') {
                 color = aoi.id % 2 === 0 ? '#eab308' : '#22c55e'; // Yellow or Green
                 fillColor = color;
               } else if (activeLayer === 'NDWI') {
-                color = '#06b6d4'; // Cyan for water
+                color = '#06b6d4'; // Cyan for Water Index
                 fillColor = '#06b6d4';
               }
 

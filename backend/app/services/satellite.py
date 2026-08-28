@@ -274,8 +274,12 @@ class SatelliteEngine:
             if index_type == "ndvi":
                 index_img = img.normalizedDifference(["B8", "B4"]).rename("NDVI")
                 reducer_name = "NDVI"
+            elif index_type == "mndwi":
+                index_img = img.normalizedDifference(["B3", "B11"]).rename("MNDWI")
+                reducer_name = "MNDWI"
             else:
-                index_img = img.normalizedDifference(["B3", "B8"]).rename("NDWI")
+                # Use MNDWI (B3 Green - B11 SWIR1) for robust surface water & moisture detection
+                index_img = img.normalizedDifference(["B3", "B11"]).rename("NDWI")
                 reducer_name = "NDWI"
 
             stats = index_img.reduceRegion(
