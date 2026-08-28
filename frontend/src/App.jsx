@@ -85,6 +85,46 @@ export default function App() {
     setDistrictDrilldown(drill);
   };
 
+  // Extract the plot's geographic centroid [lat, lng] from its polygon geometry.
+  // Used so predictions are computed for the exact location (never a stale default).
+  const getAoiCentroid = (aoi) => {
+    if (!aoi) return null;
+    let coords = null;
+    try {
+      const geom = typeof aoi.geometry === 'string' ? JSON.parse(aoi.geometry) : aoi.geometry;
+      coords = geom?.coordinates?.[0] || null;
+    } catch (_) {
+      coords = null;
+    }
+    if (Array.isArray(coords) && coords.length > 0) {
+      const n = coords.length;
+      let latSum = 0;
+      let lngSum = 0;
+      coords.forEach(c => {
+        if (Array.isArray(c) && c.length >= 2) {
+          lngSum += Number(c[0]);
+          latSum += Number(c[1]);
+        }
+      });
+      if (n > 0) return { lat: latSum / n, lon: lngSum / n };
+    }
+    return null;
+  };
+
+  // Build location context shared by every prediction fetch so both the live
+  // backend AND the offline fallback compute results for THIS plot's location.
+  const buildLocationContext = (aoi) => {
+    const centroid = getAoiCentroid(aoi);
+    return {
+      lat: centroid?.lat,
+      lon: centroid?.lon,
+      district: aoi?.district || 'Jalna',
+      state: aoi?.state || 'Maharashtra',
+      village: aoi?.village || aoi?.name || '',
+      areaHa: aoi?.area_hectares || 2.0,
+    };
+  };
+
   // When selected AOI changes, fetch timeline, prediction, and district rollup
   useEffect(() => {
     if (!selectedAoi) return;
@@ -92,7 +132,7 @@ export default function App() {
       const tl = await api.getTimeline(selectedAoi.id);
       setTimeline(tl);
 
-      const pred = await api.predictYield(selectedAoi.id, selectedAoi.crop_type);
+      const pred = await api.predictYield(selectedAoi.id, selectedAoi.crop_type, buildLocationContext(selectedAoi));
       setPrediction(pred);
 
       if (selectedAoi.district) {
@@ -144,7 +184,8 @@ export default function App() {
   };
 
   const handleUpdateCrop = async (newCrop) => {
-    const cropKey = (newCrop || 'cotton').toLowerCase();
+    const rawCrop = typeof newCrop === 'string' ? newCrop : (newCrop?.target?.value || newCrop?.crop || 'cotton');
+    const cropKey = (rawCrop || 'cotton').toLowerCase();
     if (selectedAoi) {
       const updated = { ...selectedAoi, crop_type: cropKey };
       setSelectedAoi(updated);
@@ -154,7 +195,7 @@ export default function App() {
 
       try {
         await api.updateAOI(selectedAoi.id, { crop_type: cropKey });
-        const pred = await api.predictYield(selectedAoi.id, cropKey);
+        const pred = await api.predictYield(selectedAoi.id, cropKey, buildLocationContext(selectedAoi));
         if (pred) setPrediction(pred);
       } catch (err) {
         console.warn('Failed to sync crop update with backend:', err);

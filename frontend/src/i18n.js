@@ -60,7 +60,11 @@ export const translations = {
       managePlots: "My Marked Farms",
       noPlots: "No farm plots marked yet. Use 'Locate Me' or 'Draw Farm Boundary' on the map to add your farm.",
       switchPlot: "Switch Farm",
-      activePlot: "Active Plot",
+      waterAlert: "Water Stress Alert",
+      acres: "Acres",
+      cropType: "Active Crop",
+      quintalsPerAcre: "Quintals/Acre",
+      askAiTitle: "Ask KrishiDrishti AI Agronomist (कृषी सहाय्यक)",
       voiceMessage: "Namaste Farmer brother. For your farm plot. Your crop health score is {score} percent. Action required: Please give drip irrigation within forty-eight hours to protect your crop and avoid yield loss. Expected harvest is {yield} quintals per acre."
     },
     government: {
@@ -143,7 +147,11 @@ export const translations = {
       managePlots: "माझी नोंदणीकृत शेते",
       noPlots: "अद्याप कोणतेही शेत चिन्हांकित नाही. नकाशावर 'माझे स्थान शोधा' किंवा 'शेताची हद्द आखा' वापरून शेत जोडा.",
       switchPlot: "शेत बदला",
-      activePlot: "सध्याचे शेत",
+      waterAlert: "पाणी टंचाई पूर्वसूचना",
+      acres: "एकर",
+      cropType: "सक्रिय पीक",
+      quintalsPerAcre: "क्विंटल / एकर",
+      askAiTitle: "कृषिदृष्टी AI कृषी सल्लागारास विचारा (कृषी सहाय्यक)",
       voiceMessage: "नमस्कार शेतकरी बंधू. तुमच्या शेताचा आरोग्य स्कोअर {score} टक्के आहे. तातडीचा सल्ला: बोंड गळती थांबवण्यासाठी पुढील ४८ तासांत पिकाला पाणी द्या. अपेक्षित उत्पादन {yield} क्विंटल प्रति एकर आहे."
     },
     government: {
@@ -226,7 +234,11 @@ export const translations = {
       managePlots: "मेरे चिह्नित खेत",
       noPlots: "अभी तक कोई खेत चिह्नित नहीं है। नया खेत जोड़ने के लिए नक्शे पर 'खेत की सीमा बनाएं' या 'मेरा स्थान' चुनें।",
       switchPlot: "खेत बदलें",
-      activePlot: "सक्रिय खेत",
+      waterAlert: "पानी की कमी की चेतावनी",
+      acres: "एकड़",
+      cropType: "सक्रिय फसल",
+      quintalsPerAcre: "क्विंटल / एकड़",
+      askAiTitle: "कृषिदृष्टि AI कृषि सलाहकार से पूछें (कृषि सहायक)",
       voiceMessage: "नमस्ते किसान भाई। आपके खेत का स्वास्थ्य स्कोर {score} प्रतिशत है। जरूरी सलाह: टिंडे गिरने से बचाने के लिए अगले 48 घंटों में ड्रिप सिंचाई जरूर करें। अनुमानित उपज {yield} क्विंटल प्रति एकड़ है।"
     },
     government: {

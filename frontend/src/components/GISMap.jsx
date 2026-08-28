@@ -273,15 +273,16 @@ export default function GISMap({
     const avgLng = lngSum / points.length;
 
     // Live Reverse Geocode exact location
-    let geo = { village: 'Farm Plot', taluk: 'Local Taluk', district: 'Jalna', state: 'Maharashtra' };
+    let geo = { village: 'Mantha', taluk: 'Mantha', district: 'Jalna', state: 'Maharashtra' };
     try {
       geo = await api.reverseGeocode(avgLat, avgLng);
     } catch (_) {}
 
-    const villageName = geo.village || geo.taluk || 'Local Field';
+    const rawVillage = geo.village || geo.taluk || 'Mantha';
     const districtName = geo.district || 'Jalna';
+    const villageName = (rawVillage === 'Field Plot' || rawVillage === 'Local Field' || rawVillage === 'Local Area') ? districtName : rawVillage;
     const stateName = geo.state || 'Maharashtra';
-    const plotTitle = `Farm at ${villageName}`;
+    const plotTitle = `Farm at ${villageName}, ${districtName}`;
 
     onAddAoi({
       name: plotTitle,
