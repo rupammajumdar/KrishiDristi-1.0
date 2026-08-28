@@ -523,14 +523,22 @@ export default function FarmerDashboard({
       onUpdateCrop(selectedAoi.id, cropId);
     }
     try {
-      if (selectedAoi?.id) {
-        const res = await api.getAiAdvisory(selectedAoi.id, cropId, currentLang);
+      if (selectedAoi) {
+        const pred = await api.predictYield(selectedAoi.id || 0, cropId, {
+          district: selectedAoi.district || 'Jalna',
+          state: selectedAoi.state || 'Maharashtra',
+          village: selectedAoi.village,
+          areaHa: selectedAoi.area_hectares || 2.0,
+        });
+        if (pred) setLocalPrediction(pred);
+
+        const res = await api.getAiAdvisory(selectedAoi.id || 1, cropId, currentLang);
         if (res?.tasks && Array.isArray(res.tasks) && res.tasks.length > 0) {
           setAiTasks(res.tasks);
         }
       }
     } catch (e) {
-      console.error('Error fetching crop AI advisory:', e);
+      console.error('Error updating crop prediction and AI advisory:', e);
     } finally {
       setIsLoadingAi(false);
     }
