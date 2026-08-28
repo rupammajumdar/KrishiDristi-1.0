@@ -328,8 +328,20 @@ class MLEngine:
         drought_vulnerability = "Moderate"
         regional_yield_modifier = 1.0
 
+        # 0. Chhattisgarh (Rice Bowl) — checked FIRST because its district names
+        #    and coordinates sit inside Madhya Pradesh's broad coordinate box, so
+        #    Raipur etc. must not be swallowed by the MP "Malwa" fallback.
+        if (17.5 <= lat <= 24.0 and 80.0 <= lon <= 84.5) or "chhattisgarh" in s_lower or any(d in d_lower for d in ["raipur", "bilaspur", "durg", "rajnandgaon", "bastar", "korba", "janjgir"]):
+            resolved_state = resolved_state or "Chhattisgarh"
+            resolved_district = resolved_district if resolved_district and resolved_district.lower() != "jalna" else "Raipur"
+            zone_name = f"Chhattisgarh Rice Bowl Agro-Zone ({resolved_district})"
+            soil_type = "Red and Yellow Soils (Alfisols / Dorsa)"
+            kvk_station = f"IGKV Raipur / KVK {resolved_district}"
+            drought_vulnerability = "Low-Moderate"
+            regional_yield_modifier = 1.05
+
         # 1. Punjab & Haryana (Indo-Gangetic Plain)
-        if (28.0 <= lat <= 32.5 and 73.8 <= lon <= 77.8) or "punjab" in s_lower or "haryana" in s_lower or any(d in d_lower for d in ["ludhiana", "amritsar", "patiala", "bathinda", "jalandhar", "karnal", "hisar", "kurukshetra"]):
+        elif (28.0 <= lat <= 32.5 and 73.8 <= lon <= 77.8) or "punjab" in s_lower or "haryana" in s_lower or any(d in d_lower for d in ["ludhiana", "amritsar", "patiala", "bathinda", "jalandhar", "karnal", "hisar", "kurukshetra"]):
             resolved_state = resolved_state or ("Punjab" if lat >= 30.0 else "Haryana")
             resolved_district = resolved_district if resolved_district and resolved_district.lower() != "jalna" else ("Ludhiana" if lat >= 30.0 else "Karnal")
             zone_name = f"Indo-Gangetic Alluvial Plain ({resolved_district})"
@@ -397,16 +409,6 @@ class MLEngine:
             kvk_station = f"BCKV Mohanpur / KVK {resolved_district}"
             drought_vulnerability = "Low"
             regional_yield_modifier = 1.12
-
-        # 8. Chhattisgarh (Rice Bowl)
-        elif (17.5 <= lat <= 24.0 and 80.0 <= lon <= 84.5) or "chhattisgarh" in s_lower or any(d in d_lower for d in ["raipur", "bilaspur", "durg", "rajnandgaon", "bastar", "korba", "janjgir"]):
-            resolved_state = resolved_state or "Chhattisgarh"
-            resolved_district = resolved_district if resolved_district and resolved_district.lower() != "jalna" else "Raipur"
-            zone_name = f"Chhattisgarh Rice Bowl Agro-Zone ({resolved_district})"
-            soil_type = "Red and Yellow Soils (Alfisols / Dorsa)"
-            kvk_station = f"IGKV Raipur / KVK {resolved_district}"
-            drought_vulnerability = "Low-Moderate"
-            regional_yield_modifier = 1.05
 
         # 9. Telangana (Deccan Semi-Arid Plateau)
         elif (15.8 <= lat <= 19.9 and 77.2 <= lon <= 81.8) or "telangana" in s_lower or any(d in d_lower for d in ["hyderabad", "warangal", "karimnagar", "khammam", "nizamabad", "nalgonda", "adilabad", "medak"]):
@@ -765,11 +767,13 @@ class MLEngine:
         conf_upper = round(predicted_yield + margin, 2)
 
         # Raise a drought alert only when vegetation is actually stressed. A healthy
-        # canopy (stress_class_id == 2) never triggers a drought alert on its own.
+        # canopy (stress_class_id == 2) never triggers a drought alert on its own,
+        # even if the LSTM anomaly score happens to exceed its (noisy) threshold.
         triggered_alert = (
-            (yield_change_pct <= -float(settings.EARLY_WARNING_YIELD_DROP_PCT) and rf_result["stress_class_id"] != 2)
+            (yield_change_pct <= -float(settings.EARLY_WARNING_YIELD_DROP_PCT)
+             and rf_result["stress_class_id"] != 2)
             or rf_result["stress_class_id"] == 0
-            or lstm_result["anomaly_detected"]
+            or (lstm_result["anomaly_detected"] and rf_result["stress_class_id"] != 2)
         )
 
         # SHAP-like feature importance
